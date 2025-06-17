@@ -25,15 +25,15 @@ enum ModelType {
   String get modelName {
     switch (this) {
       case ModelType.detect:
-        return 'yolo11n';
+        return 'yolo11x';
       case ModelType.segment:
-        return 'yolo11n-seg';
+        return 'yolo11x-seg';
       case ModelType.classify:
-        return 'yolo11n-cls';
+        return 'yolo11x-cls';
       case ModelType.pose:
-        return 'yolo11n-pose';
+        return 'yolo11x-pose';
       case ModelType.obb:
-        return 'yolo11n-obb';
+        return 'yolo11x-obb';
     }
   }
 

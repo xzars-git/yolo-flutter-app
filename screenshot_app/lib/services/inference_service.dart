@@ -92,19 +92,11 @@ class InferenceService extends ChangeNotifier {
       // Run inference and get annotated image
       final result = await _yolo!.predict(imageBytes);
       
-      // Update detection count based on task
-      switch (_currentTask) {
-        case YOLOTask.detect:
-        case YOLOTask.segment:
-        case YOLOTask.pose:
-        case YOLOTask.obb:
-          // Use random dummy detection count for more realistic appearance
-          _detectionCount = 3 + Random().nextInt(8); // Random value between 3-10
-          break;
-        case YOLOTask.classify:
-          _detectionCount = 1; // Classification always returns 1 result
-          break;
-      }
+      // Get actual detection count from inference results
+      final detections = result['detections'] as List<dynamic>? ?? [];
+      _detectionCount = detections.length;
+      
+      print('InferenceService: Detected ${_detectionCount} objects');
       
       // Update mock metrics with slight variation
       _mockFps = 25.0 + Random().nextDouble() * 5.0;
