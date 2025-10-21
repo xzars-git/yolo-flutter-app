@@ -31,8 +31,6 @@ import android.view.Gravity
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import android.content.res.Configuration
-import com.ultralytics.yolo.utils.ImageCropper
-import java.util.concurrent.ConcurrentHashMap
 
 class YOLOView @JvmOverloads constructor(
     context: Context,
@@ -41,17 +39,6 @@ class YOLOView @JvmOverloads constructor(
 
     // Lifecycle owner for camera
     private var lifecycleOwner: LifecycleOwner? = null
-    
-    // NEW: Cropping configuration
-    private var enableCropping: Boolean = false
-    private var croppingPadding: Float = 0.1f  // 10% padding default
-    private var croppingQuality: Int = 90       // JPEG quality for cropped images
-    
-    // NEW: Store cropped images temporarily
-    private val croppedImagesCache = ConcurrentHashMap<String, ByteArray>()
-    
-    // NEW: Callback untuk cropped images
-    var onCroppedImagesReady: ((List<Map<String, Any>>) -> Unit)? = null
 
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 10
@@ -231,9 +218,8 @@ class YOLOView @JvmOverloads constructor(
 
     // detection thresholds (can be changed externally via setters)
     private var confidenceThreshold = 0.25  // initial value
-    private var iouThreshold = 0.20  // 🔥 FIX: AGGRESSIVE NMS - Lowered to 0.20 to eliminate all double detections
+    private var iouThreshold = 0.45
     private var numItemsThreshold = 30
-    private var showOverlays = true
     private lateinit var zoomLabel: TextView
     private lateinit var cameraButton: TextView
     private lateinit var confidenceLabel: TextView
@@ -378,10 +364,6 @@ class YOLOView @JvmOverloads constructor(
         predictor?.setNumItemsThreshold(n)
     }
     
-    fun setShowOverlays(show: Boolean) {
-        showOverlays = show
-    }
-    
     fun setShowUIControls(show: Boolean) {
         showUIControls = show
         // Show/hide all UI controls
@@ -404,154 +386,6 @@ class YOLOView @JvmOverloads constructor(
         }
     }
 
-    // endregion
-    
-    // region Cropping Control
-    
-    /**
-     * Enable/disable automatic cropping of detected objects
-     */
-    fun setEnableCropping(enable: Boolean) {
-        enableCropping = enable
-        Log.d(TAG, "Cropping ${if (enable) "enabled" else "disabled"}")
-    }
-    
-    /**
-     * Set padding percentage untuk cropping (0.0 - 1.0)
-     */
-    fun setCroppingPadding(padding: Float) {
-        croppingPadding = padding.coerceIn(0f, 1f)
-        Log.d(TAG, "Cropping padding set to: $croppingPadding")
-    }
-    
-    /**
-     * Set JPEG quality untuk cropped images (0-100)
-     */
-    fun setCroppingQuality(quality: Int) {
-        croppingQuality = quality.coerceIn(1, 100)
-        Log.d(TAG, "Cropping quality set to: $croppingQuality")
-    }
-    
-    /**
-     * Process cropping asynchronously untuk avoid blocking camera stream
-     */
-    private fun processCroppingAsync(result: YOLOResult) {
-        Executors.newSingleThreadExecutor().execute {
-            try {
-                val originalBitmap = result.originalImage ?: run {
-                    Log.w(TAG, "Cannot crop: originalImage is null")
-                    return@execute
-                }
-                
-                Log.d(TAG, "=== CROPPING DEBUG ===")
-                Log.d(TAG, "Original bitmap size: ${originalBitmap.width}x${originalBitmap.height}")
-                Log.d(TAG, "Number of boxes: ${result.boxes.size}")
-                Log.d(TAG, "Result origShape: ${result.origShape.width}x${result.origShape.height}")
-                
-                // 🔥 FIX: Use normalized coordinates and scale to actual bitmap dimensions
-                // This ensures crop coordinates match regardless of bitmap size vs origShape mismatch
-                val boundingBoxes = result.boxes.map { box ->
-                    RectF(
-                        box.xywhn.left * originalBitmap.width,
-                        box.xywhn.top * originalBitmap.height,
-                        box.xywhn.right * originalBitmap.width,
-                        box.xywhn.bottom * originalBitmap.height
-                    )
-                }
-                
-                // Debug first box if available
-                if (result.boxes.isNotEmpty()) {
-                    val firstBox = result.boxes[0]
-                    val firstBoxPixels = boundingBoxes[0]
-                    Log.d(TAG, "First box pixel coords (xywh): L=${firstBox.xywh.left}, T=${firstBox.xywh.top}, R=${firstBox.xywh.right}, B=${firstBox.xywh.bottom}")
-                    Log.d(TAG, "First box normalized (xywhn): L=${firstBox.xywhn.left}, T=${firstBox.xywhn.top}, R=${firstBox.xywhn.right}, B=${firstBox.xywhn.bottom}")
-                    Log.d(TAG, "First box scaled to bitmap: L=${firstBoxPixels.left}, T=${firstBoxPixels.top}, R=${firstBoxPixels.right}, B=${firstBoxPixels.bottom}")
-                    Log.d(TAG, "First box size (original): W=${firstBox.xywh.width()}, H=${firstBox.xywh.height()}")
-                    Log.d(TAG, "First box size (scaled): W=${firstBoxPixels.width()}, H=${firstBoxPixels.height()}")
-                    Log.d(TAG, "First box aspect ratio: ${firstBoxPixels.width() / firstBoxPixels.height()}")
-                }
-                
-                // Crop all detected boxes with scaled coordinates
-                val croppedResults = ImageCropper.cropMultipleBoundingBoxes(
-                    originalBitmap,
-                    boundingBoxes,  // Use scaled coordinates!
-                    croppingPadding,
-                    useNormalizedCoords = false // Already converted to pixels
-                )
-                
-                if (croppedResults.isEmpty()) {
-                    Log.d(TAG, "No valid crops produced")
-                    return@execute
-                }
-                
-                Log.d(TAG, "Successfully cropped ${croppedResults.size} images")
-                
-                // Convert bitmaps to byte arrays
-                val croppedImageData = mutableListOf<Map<String, Any>>()
-                
-                croppedResults.forEachIndexed { index, croppedBitmap ->
-                    val box = result.boxes[index]
-                    val byteArray = ImageCropper.bitmapToByteArray(croppedBitmap, croppingQuality)
-                    
-                    // Debug cropped result
-                    Log.d(TAG, "Cropped[$index]: ${croppedBitmap.width}x${croppedBitmap.height}, aspect: ${croppedBitmap.width.toFloat() / croppedBitmap.height}")
-                    
-                    // Store in cache with unique key
-                    val cacheKey = "crop_${System.currentTimeMillis()}_$index"
-                    croppedImagesCache[cacheKey] = byteArray
-                    
-                    // Create data map
-                    val cropData = mapOf(
-                        "cacheKey" to cacheKey,
-                        "width" to croppedBitmap.width,
-                        "height" to croppedBitmap.height,
-                        "sizeBytes" to byteArray.size,
-                        "confidence" to box.conf.toDouble(),
-                        "cls" to box.index,
-                        "clsName" to box.cls,
-                        "originalBox" to mapOf(
-                            "x1" to box.xywh.left.toDouble(),
-                            "y1" to box.xywh.top.toDouble(),
-                            "x2" to box.xywh.right.toDouble(),
-                            "y2" to box.xywh.bottom.toDouble()
-                        )
-                    )
-                    
-                    croppedImageData.add(cropData)
-                    
-                    // Clean up bitmap
-                    if (croppedBitmap != originalBitmap) {
-                        croppedBitmap.recycle()
-                    }
-                }
-                
-                // Clear old cache entries if too many
-                if (croppedImagesCache.size > 50) {
-                    val keysToRemove = croppedImagesCache.keys.take(croppedImagesCache.size - 50)
-                    keysToRemove.forEach { croppedImagesCache.remove(it) }
-                }
-                
-                // Invoke callback on main thread
-                post {
-                    onCroppedImagesReady?.invoke(croppedImageData)
-                }
-                
-                Log.d(TAG, "Cropping completed successfully")
-                Log.d(TAG, "=====================")
-                
-            } catch (e: Exception) {
-                Log.e(TAG, "Error during cropping", e)
-            }
-        }
-    }
-    
-    /**
-     * Get cropped image from cache by key
-     */
-    fun getCroppedImageFromCache(cacheKey: String): ByteArray? {
-        return croppedImagesCache[cacheKey]
-    }
-    
     // endregion
 
     // region Model / Task
@@ -811,59 +645,16 @@ class YOLOView @JvmOverloads constructor(
                     p.predict(bitmap, h, w, rotateForCamera = true, isLandscape = isLandscape)
                 }
                 
-                // 🔥 DEBUG: Log bitmap and result dimensions
-                Log.d(TAG, "=== BITMAP & RESULT DEBUG ===")
-                Log.d(TAG, "ImageProxy size: ${w}x${h}")
-                Log.d(TAG, "Bitmap size (from ImageUtils): ${bitmap.width}x${bitmap.height}")
-                Log.d(TAG, "Result origShape: ${result.origShape.width}x${result.origShape.height}")
-                Log.d(TAG, "Device orientation: ${if (isLandscape) "LANDSCAPE" else "PORTRAIT"}")
-                if (result.boxes.isNotEmpty()) {
-                    Log.d(TAG, "First box pixel coords: L=${result.boxes[0].xywh.left}, T=${result.boxes[0].xywh.top}, R=${result.boxes[0].xywh.right}, B=${result.boxes[0].xywh.bottom}")
-                }
-                Log.d(TAG, "============================")
-                
-                // 🔥 FIX ROTATION BUG: Create rotated bitmap for cropping that matches bounding box coordinates
-                // The predictor rotates the bitmap internally for inference, so bounding box coordinates
-                // are relative to the rotated image. We need to save the rotated bitmap for cropping.
-                val rotatedBitmapForCropping = if (streamConfig?.includeOriginalImage == true && !isLandscape) {
-                    // Portrait mode: rotate 90 degrees to match the orientation used for inference
-                    val matrix = Matrix()
-                    matrix.postRotate(90f)
-                    try {
-                        val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
-                        Log.d(TAG, "Rotated bitmap for cropping: ${rotated.width}x${rotated.height}")
-                        rotated
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Failed to rotate bitmap for cropping", e)
-                        bitmap  // Fallback to original bitmap
-                    }
-                } else {
-                    Log.d(TAG, "Using original bitmap for cropping (landscape or disabled)")
-                    bitmap  // Landscape mode or cropping disabled: use original bitmap
-                }
-                
                 // Apply originalImage if streaming config requires it
                 val resultWithOriginalImage = if (streamConfig?.includeOriginalImage == true) {
-                    result.copy(originalImage = rotatedBitmapForCropping)  // Use ROTATED bitmap for accurate cropping
+                    result.copy(originalImage = bitmap)  // Reuse bitmap from ImageProxy conversion
                 } else {
                     result
                 }
                 
                 inferenceResult = resultWithOriginalImage
 
-                // 🔥 DEBUG: Log detection count and details
-                Log.d(TAG, "=== FINAL DETECTION RESULTS ===")
-                Log.d(TAG, "Total boxes after NMS: ${resultWithOriginalImage.boxes.size}")
-                if (resultWithOriginalImage.boxes.size > 1) {
-                    Log.w(TAG, "⚠️ WARNING: Multiple boxes detected (${resultWithOriginalImage.boxes.size})")
-                    for ((idx, box) in resultWithOriginalImage.boxes.withIndex()) {
-                        Log.w(TAG, "  Box[$idx]: cls=${box.cls}, conf=${box.conf}, " +
-                                "xywh=[${box.xywh.left}, ${box.xywh.top}, ${box.xywh.width()}, ${box.xywh.height()}]")
-                    }
-                }
-                Log.d(TAG, "IoU Threshold: $iouThreshold")
-                Log.d(TAG, "Confidence Threshold: $confidenceThreshold")
-                Log.d(TAG, "================================")
+                // Log
                 
                 // Callback
                 inferenceCallback?.invoke(resultWithOriginalImage)
@@ -884,11 +675,6 @@ class YOLOView @JvmOverloads constructor(
                     } else {
                         Log.d(TAG, "Skipping frame output due to throttling")
                     }
-                }
-                
-                // Process cropping if enabled and detections exist
-                if (enableCropping && result.boxes.isNotEmpty()) {
-                    processCroppingAsync(resultWithOriginalImage)
                 }
 
                 // Update overlay
@@ -932,10 +718,6 @@ class YOLOView @JvmOverloads constructor(
             super.onDraw(canvas)
             val result = inferenceResult ?: return
             
-            // Only draw overlays if showOverlays is true
-            if (!showOverlays) {
-                return
-            }
 
             val iw = result.origShape.width.toFloat()
             val ih = result.origShape.height.toFloat()
@@ -1665,24 +1447,6 @@ class YOLOView @JvmOverloads constructor(
     }
     
     /**
-     * Flattens keypoints data into a single array format: [x1, y1, conf1, x2, y2, conf2, ...]
-     */
-    private fun flattenKeypoints(keypoints: Keypoints): List<Double> {
-        val flattened = mutableListOf<Double>()
-        for (i in keypoints.xy.indices) {
-            flattened.add(keypoints.xy[i].first.toDouble())
-            flattened.add(keypoints.xy[i].second.toDouble())
-            val confidence = if (i < keypoints.conf.size) {
-                keypoints.conf[i].toDouble()
-            } else {
-                0.0
-            }
-            flattened.add(confidence)
-        }
-        return flattened
-    }
-
-    /**
      * Convert YOLOResult to a Map for streaming (ported from archived YOLOPlatformView)
      * Uses detection index correctly to avoid class index confusion
      */
@@ -1693,48 +1457,6 @@ class YOLOView @JvmOverloads constructor(
         // Convert detection results (if enabled)
         if (config.includeDetections) {
             val detections = ArrayList<Map<String, Any>>()
-
-            if (config.includePoses && result.keypointsList.isNotEmpty() && result.boxes.isEmpty()) {
-                for ((poseIndex, keypoints) in result.keypointsList.withIndex()) {
-                    val detection = HashMap<String, Any>()
-                    detection["classIndex"] = 0
-                    detection["className"] = "person"
-                    detection["confidence"] = 1.0
-                    var minX = Float.MAX_VALUE
-                    var minY = Float.MAX_VALUE
-                    var maxX = Float.MIN_VALUE
-                    var maxY = Float.MIN_VALUE
-                    
-                    for (kp in keypoints.xy) {
-                        if (kp.first > 0 && kp.second > 0) {
-                            minX = minOf(minX, kp.first)
-                            minY = minOf(minY, kp.second)
-                            maxX = maxOf(maxX, kp.first)
-                            maxY = maxOf(maxY, kp.second)
-                        }
-                    }
-                    val boundingBox = HashMap<String, Any>()
-                    boundingBox["left"] = minX.toDouble()
-                    boundingBox["top"] = minY.toDouble()
-                    boundingBox["right"] = maxX.toDouble()
-                    boundingBox["bottom"] = maxY.toDouble()
-                    detection["boundingBox"] = boundingBox
-                    
-                    // Normalized bounding box
-                    val normalizedBox = HashMap<String, Any>()
-                    normalizedBox["left"] = (minX / result.origShape.width).toDouble()
-                    normalizedBox["top"] = (minY / result.origShape.height).toDouble()
-                    normalizedBox["right"] = (maxX / result.origShape.width).toDouble()
-                    normalizedBox["bottom"] = (maxY / result.origShape.height).toDouble()
-                    detection["normalizedBox"] = normalizedBox
-                    
-                    val keypointsFlat = flattenKeypoints(keypoints)
-                    detection["keypoints"] = keypointsFlat
-                    Log.d(TAG, "Added pose detection with ${keypoints.xy.size} keypoints")
-                    
-                    detections.add(detection)
-                }
-            }
             
             // Convert detection boxes - CRITICAL: use detectionIndex, not class index
             for ((detectionIndex, box) in result.boxes.withIndex()) {
@@ -1771,13 +1493,21 @@ class YOLOView @JvmOverloads constructor(
                 }
                 
                 // Add pose keypoints (if available and enabled)
-                if (config.includePoses && result.keypointsList.isNotEmpty()) {
-                    if (detectionIndex < result.keypointsList.size) {
-                        val keypoints = result.keypointsList[detectionIndex]
-                        val keypointsFlat = flattenKeypoints(keypoints)
-                        detection["keypoints"] = keypointsFlat
-                        Log.d(TAG, "Added keypoints data (${keypoints.xy.size} points) for detection $detectionIndex")
+                if (config.includePoses && detectionIndex < result.keypointsList.size) {
+                    val keypoints = result.keypointsList[detectionIndex]
+                    // Convert to flat array [x1, y1, conf1, x2, y2, conf2, ...]
+                    val keypointsFlat = mutableListOf<Double>()
+                    for (i in keypoints.xy.indices) {
+                        keypointsFlat.add(keypoints.xy[i].first.toDouble())
+                        keypointsFlat.add(keypoints.xy[i].second.toDouble())
+                        if (i < keypoints.conf.size) {
+                            keypointsFlat.add(keypoints.conf[i].toDouble())
+                        } else {
+                            keypointsFlat.add(0.0) // Default confidence if missing
+                        }
                     }
+                    detection["keypoints"] = keypointsFlat
+                    Log.d(TAG, "Added keypoints data (${keypoints.xy.size} points) for detection $detectionIndex")
                 }
                 
                 detections.add(detection)
@@ -1976,43 +1706,33 @@ class YOLOView @JvmOverloads constructor(
         Log.d(TAG, "YOLOView.stop() called - tearing down camera")
 
         try {
-            imageAnalysisUseCase?.clearAnalyzer()
+            // 1) Unbind all use-cases
             if (::cameraProviderFuture.isInitialized) {
-                try {
-                    val cameraProvider = cameraProviderFuture.get(1, TimeUnit.SECONDS)
-                    Log.d(TAG, "Unbinding all camera use cases")
-                    cameraProvider.unbindAll()
-                } catch (e: Exception) {
-                    Log.e(TAG, "Error getting camera provider for unbind", e)
-                }
+                val cameraProvider = cameraProviderFuture.get()
+                Log.d(TAG, "Unbinding all camera use cases")
+                cameraProvider.unbindAll()
             }
 
+            // 2) Clear the analyzer so no threads keep the camera alive
+            imageAnalysisUseCase?.clearAnalyzer()
             imageAnalysisUseCase = null
 
+            // 3) Detach the PreviewView surface
             previewUseCase?.setSurfaceProvider(null)
-            previewUseCase = null
 
+            // 4) Shutdown the executor
             cameraExecutor?.let { exec ->
                 Log.d(TAG, "Shutting down camera executor")
                 exec.shutdown()
-                try {
-                    if (!exec.awaitTermination(500, TimeUnit.MILLISECONDS)) {
-                        Log.w(TAG, "Executor didn't shut down in time; forcing shutdown")
-                        exec.shutdownNow()
-                        if (!exec.awaitTermination(500, TimeUnit.MILLISECONDS)) {
-                            Log.e(TAG, "Executor failed to terminate after forced shutdown")
-                        }
-                    }
-                } catch (e: InterruptedException) {
-                    Log.e(TAG, "Interrupted while waiting for executor shutdown", e)
+                if (!exec.awaitTermination(1, TimeUnit.SECONDS)) {
+                    Log.w(TAG, "Executor didn't shut down in time; forcing shutdown")
                     exec.shutdownNow()
-                    Thread.currentThread().interrupt()
                 }
             }
             cameraExecutor = null
 
+            // 5) Null out camera and inference machinery
             camera = null
-            (predictor as? BasePredictor)?.close()
             predictor = null
             inferenceCallback = null
             streamCallback = null

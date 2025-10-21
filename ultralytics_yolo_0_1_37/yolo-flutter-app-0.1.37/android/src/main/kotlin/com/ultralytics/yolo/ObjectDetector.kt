@@ -339,13 +339,8 @@ class ObjectDetector(
             numItemsThreshold = numItemsThreshold,
             numClasses = labels.size
         )
-        
-        // 🔥 DEBUG: Log detection results before NMS
-        Log.d(TAG, "=== DETECTION RESULTS (Post-NMS) ===")
-        Log.d(TAG, "Total detections after NMS: ${resultBoxes.size}")
-        
         for ((index, boxArray) in resultBoxes.withIndex()) {
-            Log.d(TAG, "Detection[$index]: x=${boxArray[0]}, y=${boxArray[1]}, w=${boxArray[2]}, h=${boxArray[3]}, conf=${boxArray[4]}, cls=${boxArray[5].toInt()}")
+            Log.d(TAG, "Postprocess result - Box $index: ${boxArray.joinToString(", ")}")
         }
         // Convert to Box list
         val boxes = mutableListOf<Box>()
@@ -399,7 +394,7 @@ class ObjectDetector(
 
     // Thresholds (like setConfidenceThreshold, setIouThreshold in TFLiteDetector)
     private var confidenceThreshold = 0.25f
-    private var iouThreshold = 0.2f  // 🔥 FIX: AGGRESSIVE NMS - Lowered to 0.20 to eliminate all double detections
+    private var iouThreshold = 0.4f
     private var numItemsThreshold = 30
 
     override fun setConfidenceThreshold(conf: Double) {

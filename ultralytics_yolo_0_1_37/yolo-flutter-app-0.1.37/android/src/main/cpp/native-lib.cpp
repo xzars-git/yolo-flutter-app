@@ -8,10 +8,6 @@
 #include <cmath>
 #include <cfloat>
 #include <cstdlib>
-#include <android/log.h>  // 🔥 ADD: For debug logging
-
-#define LOG_TAG "NMS_DEBUG"
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
 
 // Custom rectangle structure
 struct Rect {
@@ -80,63 +76,21 @@ static void nms_sorted_bboxes(const std::vector<DetectedObject>& objects, std::v
     for (int i = 0; i < n; i++) {
         areas[i] = objects[i].rect.width * objects[i].rect.height;
     }
-    
-    // 🔥 DEBUG: Log NMS start
-    LOGD("=== NMS START: %d objects, threshold=%.3f ===", n, nms_threshold);
-    
     for (int i = 0; i < n; i++) {
         const DetectedObject &a = objects[i];
         bool keep = true;
-        float max_iou = 0.0f;  // 🔥 ADD: Track maximum IoU for this box
-        int suppressed_by = -1; // 🔥 ADD: Track which box suppressed this one
-        
         for (int j = 0; j < (int)picked.size(); j++) {
             const DetectedObject &b = objects[picked[j]];
-            
-            // 🔥 FIX: CRITICAL - Only compare boxes of the SAME CLASS
-            // Different classes should NEVER suppress each other
-            if (a.index != b.index) {
-                LOGD("  ⚠️ Box[%d](cls=%d) vs Box[%d](cls=%d): DIFFERENT CLASSES - SKIP", 
-                     i, a.index, picked[j], b.index);
-                continue;  // Skip NMS comparison for different classes
-            }
-            
             float inter_area = intersection_area(a, b);
             float union_area = areas[i] + areas[picked[j]] - inter_area;
-            float iou = (union_area > 0) ? (inter_area / union_area) : 0.0f;
-            
-            // 🔥 DEBUG: Log IoU calculation for overlapping boxes
-            if (iou > 0.1f) {  // Only log if there's significant overlap
-                LOGD("  Box[%d](cls=%d, conf=%.3f) vs Box[%d](cls=%d, conf=%.3f): IoU=%.3f", 
-                     i, a.index, a.confidence, 
-                     picked[j], b.index, b.confidence, 
-                     iou);
-            }
-            
-            if (iou > max_iou) {
-                max_iou = iou;
-                suppressed_by = picked[j];
-            }
-            
-            if (union_area > 0 && (iou > nms_threshold)) {
+            if (union_area > 0 && (inter_area / union_area > nms_threshold)) {
                 keep = false;
-                // 🔥 DEBUG: Log suppression
-                LOGD("  ❌ Box[%d] SUPPRESSED by Box[%d] (IoU=%.3f > threshold=%.3f)", 
-                     i, picked[j], iou, nms_threshold);
                 break;
             }
         }
-        
-        if (keep) {
+        if (keep)
             picked.push_back(i);
-            // 🔥 DEBUG: Log kept box
-            LOGD("  ✅ Box[%d](cls=%d, conf=%.3f) KEPT (max_IoU=%.3f)", 
-                 i, a.index, a.confidence, max_iou);
-        }
     }
-    
-    // 🔥 DEBUG: Log NMS result
-    LOGD("=== NMS END: %d/%d boxes kept ===", (int)picked.size(), n);
 }
 
 extern "C"
@@ -166,11 +120,6 @@ Java_com_ultralytics_yolo_ObjectDetector_postprocess(
 
     // Extract box candidates (proposals)
     std::vector<DetectedObject> proposals;
-    
-    // 🔥 DEBUG: Log extraction start
-    LOGD("=== PROPOSAL EXTRACTION: w=%d, h=%d, classes=%d, conf_thresh=%.3f ===", 
-         w, h, num_classes, confidence_threshold);
-    
     for (int i = 0; i < w; ++i) {
         int class_index = 0;
         float class_score = -FLT_MAX;
@@ -199,16 +148,8 @@ Java_com_ultralytics_yolo_ObjectDetector_postprocess(
             obj.confidence = class_score;
 
             proposals.push_back(obj);
-            
-            // 🔥 DEBUG: Log each proposal that passes confidence threshold
-            LOGD("  Proposal[%d]: cls=%d, conf=%.3f, x=%.3f, y=%.3f, w=%.3f, h=%.3f", 
-                 (int)proposals.size() - 1, class_index, class_score, 
-                 obj.rect.x, obj.rect.y, obj.rect.width, obj.rect.height);
         }
     }
-    
-    // 🔥 DEBUG: Log total proposals before NMS
-    LOGD("=== TOTAL PROPOSALS BEFORE NMS: %d ===", (int)proposals.size());
 
     // Sort by score
     qsort_descent_inplace(proposals);
