@@ -443,15 +443,40 @@ class YOLOView @JvmOverloads constructor(
                     return@execute
                 }
                 
-                // Convert List<Box> to List<RectF> for cropping
-                val boundingBoxes = result.boxes.map { box -> box.xywh }
+                Log.d(TAG, "=== CROPPING DEBUG ===")
+                Log.d(TAG, "Original bitmap size: ${originalBitmap.width}x${originalBitmap.height}")
+                Log.d(TAG, "Number of boxes: ${result.boxes.size}")
+                Log.d(TAG, "Result origShape: ${result.origShape.width}x${result.origShape.height}")
                 
-                // Crop all detected boxes
+                // 🔥 FIX: Use normalized coordinates and scale to actual bitmap dimensions
+                // This ensures crop coordinates match regardless of bitmap size vs origShape mismatch
+                val boundingBoxes = result.boxes.map { box ->
+                    RectF(
+                        box.xywhn.left * originalBitmap.width,
+                        box.xywhn.top * originalBitmap.height,
+                        box.xywhn.right * originalBitmap.width,
+                        box.xywhn.bottom * originalBitmap.height
+                    )
+                }
+                
+                // Debug first box if available
+                if (result.boxes.isNotEmpty()) {
+                    val firstBox = result.boxes[0]
+                    val firstBoxPixels = boundingBoxes[0]
+                    Log.d(TAG, "First box pixel coords (xywh): L=${firstBox.xywh.left}, T=${firstBox.xywh.top}, R=${firstBox.xywh.right}, B=${firstBox.xywh.bottom}")
+                    Log.d(TAG, "First box normalized (xywhn): L=${firstBox.xywhn.left}, T=${firstBox.xywhn.top}, R=${firstBox.xywhn.right}, B=${firstBox.xywhn.bottom}")
+                    Log.d(TAG, "First box scaled to bitmap: L=${firstBoxPixels.left}, T=${firstBoxPixels.top}, R=${firstBoxPixels.right}, B=${firstBoxPixels.bottom}")
+                    Log.d(TAG, "First box size (original): W=${firstBox.xywh.width()}, H=${firstBox.xywh.height()}")
+                    Log.d(TAG, "First box size (scaled): W=${firstBoxPixels.width()}, H=${firstBoxPixels.height()}")
+                    Log.d(TAG, "First box aspect ratio: ${firstBoxPixels.width() / firstBoxPixels.height()}")
+                }
+                
+                // Crop all detected boxes with scaled coordinates
                 val croppedResults = ImageCropper.cropMultipleBoundingBoxes(
                     originalBitmap,
-                    boundingBoxes,
+                    boundingBoxes,  // Use scaled coordinates!
                     croppingPadding,
-                    useNormalizedCoords = false // YOLOResult boxes are in pixel coordinates
+                    useNormalizedCoords = false // Already converted to pixels
                 )
                 
                 if (croppedResults.isEmpty()) {
@@ -459,12 +484,17 @@ class YOLOView @JvmOverloads constructor(
                     return@execute
                 }
                 
+                Log.d(TAG, "Successfully cropped ${croppedResults.size} images")
+                
                 // Convert bitmaps to byte arrays
                 val croppedImageData = mutableListOf<Map<String, Any>>()
                 
                 croppedResults.forEachIndexed { index, croppedBitmap ->
                     val box = result.boxes[index]
                     val byteArray = ImageCropper.bitmapToByteArray(croppedBitmap, croppingQuality)
+                    
+                    // Debug cropped result
+                    Log.d(TAG, "Cropped[$index]: ${croppedBitmap.width}x${croppedBitmap.height}, aspect: ${croppedBitmap.width.toFloat() / croppedBitmap.height}")
                     
                     // Store in cache with unique key
                     val cacheKey = "crop_${System.currentTimeMillis()}_$index"
@@ -506,7 +536,8 @@ class YOLOView @JvmOverloads constructor(
                     onCroppedImagesReady?.invoke(croppedImageData)
                 }
                 
-                Log.d(TAG, "Cropped ${croppedResults.size} images successfully")
+                Log.d(TAG, "Cropping completed successfully")
+                Log.d(TAG, "=====================")
                 
             } catch (e: Exception) {
                 Log.e(TAG, "Error during cropping", e)
@@ -780,9 +811,40 @@ class YOLOView @JvmOverloads constructor(
                     p.predict(bitmap, h, w, rotateForCamera = true, isLandscape = isLandscape)
                 }
                 
+                // 🔥 DEBUG: Log bitmap and result dimensions
+                Log.d(TAG, "=== BITMAP & RESULT DEBUG ===")
+                Log.d(TAG, "ImageProxy size: ${w}x${h}")
+                Log.d(TAG, "Bitmap size (from ImageUtils): ${bitmap.width}x${bitmap.height}")
+                Log.d(TAG, "Result origShape: ${result.origShape.width}x${result.origShape.height}")
+                Log.d(TAG, "Device orientation: ${if (isLandscape) "LANDSCAPE" else "PORTRAIT"}")
+                if (result.boxes.isNotEmpty()) {
+                    Log.d(TAG, "First box pixel coords: L=${result.boxes[0].xywh.left}, T=${result.boxes[0].xywh.top}, R=${result.boxes[0].xywh.right}, B=${result.boxes[0].xywh.bottom}")
+                }
+                Log.d(TAG, "============================")
+                
+                // 🔥 FIX ROTATION BUG: Create rotated bitmap for cropping that matches bounding box coordinates
+                // The predictor rotates the bitmap internally for inference, so bounding box coordinates
+                // are relative to the rotated image. We need to save the rotated bitmap for cropping.
+                val rotatedBitmapForCropping = if (streamConfig?.includeOriginalImage == true && !isLandscape) {
+                    // Portrait mode: rotate 90 degrees to match the orientation used for inference
+                    val matrix = Matrix()
+                    matrix.postRotate(90f)
+                    try {
+                        val rotated = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
+                        Log.d(TAG, "Rotated bitmap for cropping: ${rotated.width}x${rotated.height}")
+                        rotated
+                    } catch (e: Exception) {
+                        Log.e(TAG, "Failed to rotate bitmap for cropping", e)
+                        bitmap  // Fallback to original bitmap
+                    }
+                } else {
+                    Log.d(TAG, "Using original bitmap for cropping (landscape or disabled)")
+                    bitmap  // Landscape mode or cropping disabled: use original bitmap
+                }
+                
                 // Apply originalImage if streaming config requires it
                 val resultWithOriginalImage = if (streamConfig?.includeOriginalImage == true) {
-                    result.copy(originalImage = bitmap)  // Reuse bitmap from ImageProxy conversion
+                    result.copy(originalImage = rotatedBitmapForCropping)  // Use ROTATED bitmap for accurate cropping
                 } else {
                     result
                 }

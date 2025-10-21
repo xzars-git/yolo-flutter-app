@@ -119,12 +119,14 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                   
                   // Enhanced streaming configuration for license plates
                   streamingConfig: const YOLOStreamingConfig(
-                    enableCropping: true,        // Enable automatic cropping
-                    croppingPadding: 0.15,       // 15% padding - same as before
-                    croppingQuality: 95,         // High quality
-                    inferenceFrequency: 10,      // Balanced performance
-                    includeDetections: true,     // Include detection data
-                    includeOriginalImage: true,  // CRITICAL: Required for cropping!
+                    enableCropping: true,         // Enable automatic cropping
+                    croppingPadding: 0.0,         // NO padding - exact bounding box
+                    croppingQuality: 95,          // High quality JPEG compression
+                    inferenceFrequency: 15,       // 15 FPS for stability
+                    includeDetections: true,      // Include detection data
+                    includeOriginalImage: true,   // CRITICAL: Required for cropping!
+                    includeFps: false,            // Reduce processing overhead
+                    includeProcessingTimeMs: false, // Reduce processing overhead
                   ),
                   
                   // Handle cropped license plates
@@ -148,10 +150,17 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
 
                     // Detailed logging for license plates
                     for (final img in images) {
-                      debugPrint('🚗 Cropped License Plate: ${img.clsName} '
-                          '| Size: ${img.width}x${img.height} '
-                          '| Confidence: ${(img.confidence * 100).toStringAsFixed(1)}% '
-                          '| File Size: ${(img.sizeBytes / 1024).toStringAsFixed(1)}KB');
+                      debugPrint('🚗 ========== CROPPED PLATE DETAILS ==========');
+                      debugPrint('   Class: ${img.clsName}');
+                      debugPrint('   Confidence: ${(img.confidence * 100).toStringAsFixed(1)}%');
+                      debugPrint('   Crop Size: ${img.width}x${img.height} pixels');
+                      debugPrint('   File Size: ${(img.sizeBytes / 1024).toStringAsFixed(1)} KB');
+                      debugPrint('   Original Box: (${img.originalBox.x1.toInt()}, ${img.originalBox.y1.toInt()}) → (${img.originalBox.x2.toInt()}, ${img.originalBox.y2.toInt()})');
+                      debugPrint('   Box Width: ${(img.originalBox.x2 - img.originalBox.x1).toInt()}');
+                      debugPrint('   Box Height: ${(img.originalBox.y2 - img.originalBox.y1).toInt()}');
+                      debugPrint('   Aspect Ratio - Box: ${((img.originalBox.x2 - img.originalBox.x1) / (img.originalBox.y2 - img.originalBox.y1)).toStringAsFixed(2)}');
+                      debugPrint('   Aspect Ratio - Crop: ${(img.width / img.height).toStringAsFixed(2)}');
+                      debugPrint('==========================================');
                     }
                   },
                   
