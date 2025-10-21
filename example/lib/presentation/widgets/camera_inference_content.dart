@@ -3,14 +3,14 @@
 import 'package:flutter/material.dart';
 import 'package:ultralytics_yolo/yolo_streaming_config.dart';
 import 'package:ultralytics_yolo/yolo_view.dart';
-import '../controllers/camera_inference_controller.dart';
+import '../controllers/base_inference_controller.dart';
 import 'model_loading_overlay.dart';
 
 /// Main content widget that handles the camera view and loading states
 class CameraInferenceContent extends StatelessWidget {
   const CameraInferenceContent({super.key, required this.controller});
 
-  final CameraInferenceController controller;
+  final BaseInferenceController controller;
 
   @override
   Widget build(BuildContext context) {

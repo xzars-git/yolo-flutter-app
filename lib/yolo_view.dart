@@ -1,12 +1,14 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 import 'dart:async';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:ultralytics_yolo/utils/logger.dart';
 import 'package:ultralytics_yolo/models/yolo_result.dart';
 import 'package:ultralytics_yolo/models/yolo_task.dart';
+import 'package:ultralytics_yolo/models/yolo_cropped_image.dart';
 import 'package:ultralytics_yolo/yolo_streaming_config.dart';
 import 'package:ultralytics_yolo/yolo_performance_metrics.dart';
 import 'package:ultralytics_yolo/utils/map_converter.dart';
@@ -23,6 +25,7 @@ class YOLOView extends StatefulWidget {
   final Function(List<YOLOResult>)? onResult;
   final Function(YOLOPerformanceMetrics)? onPerformanceMetrics;
   final Function(Map<String, dynamic>)? onStreamingData;
+  final Function(List<YOLOCroppedImage>)? onCroppedImages;
   final bool showNativeUI;
   final Function(double zoomLevel)? onZoomChanged;
   final YOLOStreamingConfig? streamingConfig;
@@ -41,6 +44,7 @@ class YOLOView extends StatefulWidget {
     this.onResult,
     this.onPerformanceMetrics,
     this.onStreamingData,
+    this.onCroppedImages,
     this.showNativeUI = false,
     this.onZoomChanged,
     this.streamingConfig,
@@ -79,6 +83,9 @@ class _YOLOViewState extends State<YOLOView> {
   void _setupChannels() {
     _methodChannel = ChannelConfig.createControlChannel(_viewId);
     _resultEventChannel = ChannelConfig.createDetectionResultsChannel(_viewId);
+    
+    // Setup method call handler for cropped images
+    _methodChannel.setMethodCallHandler(_handleMethodCall);
   }
 
   void _subscribeToResults() {
@@ -319,9 +326,42 @@ class _YOLOViewState extends State<YOLOView> {
       }
 
       creationParams['streamingConfig'] = streamConfig;
+      
+      // Send cropping configuration to native after view is created
+      Future.delayed(const Duration(milliseconds: 100), () {
+        if (mounted) {
+          _sendCroppingConfiguration();
+        }
+      });
     }
 
     return creationParams;
+  }
+
+  /// Send cropping configuration to native platform
+  Future<void> _sendCroppingConfiguration() async {
+    if (widget.streamingConfig == null) return;
+    
+    try {
+      await _methodChannel.invokeMethod('setEnableCropping', {
+        'enable': widget.streamingConfig!.enableCropping,
+      });
+      
+      await _methodChannel.invokeMethod('setCroppingPadding', {
+        'padding': widget.streamingConfig!.croppingPadding,
+      });
+      
+      await _methodChannel.invokeMethod('setCroppingQuality', {
+        'quality': widget.streamingConfig!.croppingQuality,
+      });
+      
+      logInfo('YOLOView: Cropping configuration sent - '
+          'enabled: ${widget.streamingConfig!.enableCropping}, '
+          'padding: ${widget.streamingConfig!.croppingPadding}, '
+          'quality: ${widget.streamingConfig!.croppingQuality}');
+    } catch (e) {
+      logInfo('YOLOView: Error sending cropping configuration: $e');
+    }
   }
 
   void _onPlatformViewCreated(int id) {
@@ -358,8 +398,50 @@ class _YOLOViewState extends State<YOLOView> {
           widget.onZoomChanged!(zoomLevel);
         }
         return null;
+      case 'onCroppedImages':
+        await _handleCroppedImages(call.arguments);
+        return null;
       default:
         return null;
+    }
+  }
+
+  /// Handle cropped images received from native
+  Future<void> _handleCroppedImages(dynamic arguments) async {
+    if (widget.onCroppedImages == null) return;
+    if (arguments is! Map) return;
+
+    try {
+      final List<dynamic> imagesData = arguments['images'] ?? [];
+      final croppedImages = <YOLOCroppedImage>[];
+
+      for (final imageData in imagesData) {
+        if (imageData is! Map) continue;
+
+        // Parse cropped image metadata
+        final croppedImage = YOLOCroppedImage.fromMap(imageData);
+        
+        // Fetch actual image bytes from cache
+        try {
+          final imageBytes = await _methodChannel.invokeMethod<Uint8List>(
+            'getCroppedImage',
+            {'cacheKey': croppedImage.cacheKey},
+          );
+          
+          if (imageBytes != null) {
+            croppedImage.setImageBytes(imageBytes);
+            croppedImages.add(croppedImage);
+          }
+        } catch (e) {
+          logInfo('YOLOView: Error fetching image for ${croppedImage.cacheKey}: $e');
+        }
+      }
+
+      if (croppedImages.isNotEmpty) {
+        widget.onCroppedImages!(croppedImages);
+      }
+    } catch (e) {
+      logInfo('YOLOView: Error handling cropped images: $e');
     }
   }
 

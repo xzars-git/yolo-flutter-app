@@ -4,6 +4,7 @@ export 'yolo.dart';
 export 'models/yolo_exceptions.dart';
 export 'models/yolo_result.dart';
 export 'models/yolo_task.dart';
+export 'models/yolo_cropped_image.dart';
 export 'yolo_view.dart';
 export 'yolo_streaming_config.dart';
 export 'yolo_performance_metrics.dart';

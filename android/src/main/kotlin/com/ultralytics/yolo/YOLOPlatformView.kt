@@ -109,6 +109,11 @@ class YOLOPlatformView(
                 // Callback for compatibility
             }
             
+            // Set up cropped images callback
+            yoloView.onCroppedImagesReady = { croppedImageData ->
+                sendCroppedImages(croppedImageData)
+            }
+            
             // Load model
             val useGpu = creationParams?.get("useGpu") as? Boolean ?: true
             yoloView.setModel(modelPath, task, useGpu)
@@ -291,6 +296,24 @@ class YOLOPlatformView(
         }
     }
     
+    /**
+     * Send cropped images data to Flutter via method channel
+     */
+    private fun sendCroppedImages(croppedImageData: List<Map<String, Any>>) {
+        try {
+            retryHandler.post {
+                methodChannel?.invokeMethod("onCroppedImages", mapOf(
+                    "viewId" to viewUniqueId,
+                    "images" to croppedImageData,
+                    "timestamp" to System.currentTimeMillis()
+                ))
+            }
+            Log.d(TAG, "Sent ${croppedImageData.size} cropped images to Flutter")
+        } catch (e: Exception) {
+            Log.e(TAG, "Error sending cropped images to Flutter", e)
+        }
+    }
+    
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {
         try {
             when (call.method) {
@@ -427,6 +450,49 @@ class YOLOPlatformView(
                     yoloView.setShowUIControls(show)
                     result.success(null)
                 }
+                "setEnableCropping" -> {
+                    val enable = call.argument<Boolean>("enable")
+                    if (enable != null) {
+                        yoloView.setEnableCropping(enable)
+                        Log.d(TAG, "Cropping enabled: $enable")
+                        result.success(null)
+                    } else {
+                        result.error("invalid_args", "enable is required", null)
+                    }
+                }
+                "setCroppingPadding" -> {
+                    val padding = call.argument<Double>("padding")
+                    if (padding != null) {
+                        yoloView.setCroppingPadding(padding.toFloat())
+                        Log.d(TAG, "Cropping padding set: $padding")
+                        result.success(null)
+                    } else {
+                        result.error("invalid_args", "padding is required", null)
+                    }
+                }
+                "setCroppingQuality" -> {
+                    val quality = call.argument<Int>("quality")
+                    if (quality != null) {
+                        yoloView.setCroppingQuality(quality)
+                        Log.d(TAG, "Cropping quality set: $quality")
+                        result.success(null)
+                    } else {
+                        result.error("invalid_args", "quality is required", null)
+                    }
+                }
+                "getCroppedImage" -> {
+                    val cacheKey = call.argument<String>("cacheKey")
+                    if (cacheKey != null) {
+                        val imageData = yoloView.getCroppedImageFromCache(cacheKey)
+                        if (imageData != null) {
+                            result.success(imageData)
+                        } else {
+                            result.error("not_found", "Cropped image not found in cache", null)
+                        }
+                    } else {
+                        result.error("invalid_args", "cacheKey is required", null)
+                    }
+                }
                 else -> {
                     result.notImplemented()
                 }
@@ -452,6 +518,7 @@ class YOLOPlatformView(
             yoloView.setStreamCallback { }
             yoloView.setOnInferenceCallback { }
             yoloView.setOnModelLoadCallback { }
+            yoloView.onCroppedImagesReady = null
         } catch (e: Exception) {
             Log.e(TAG, "Error during disposal", e)
         }

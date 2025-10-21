@@ -106,18 +106,30 @@ class ModelManager {
         'modelPath': bundledName,
       });
       if (result != null && result['exists'] == true) {
+        _updateStatus('Found ${modelType.modelName} model in assets');
         return result['location'] == 'assets'
             ? bundledName
             : result['path'] as String;
       }
-    } catch (_) {}
+    } catch (e) {
+      _updateStatus('Asset check failed: $e');
+    }
 
     // Check local storage
     final dir = await getApplicationDocumentsDirectory();
     final modelFile = File('${dir.path}/$bundledName');
-    if (await modelFile.exists()) return modelFile.path;
+    if (await modelFile.exists()) {
+      _updateStatus('Found ${modelType.modelName} model in local storage');
+      return modelFile.path;
+    }
 
-    // Download if not found
+    // For custom models like plat_recognation, don't try to download
+    if (modelType == ModelType.platRecognition) {
+      _updateStatus('Custom model ${modelType.modelName} not found in assets or local storage');
+      throw Exception('Model ${modelType.modelName}.tflite not found. Please ensure it is placed in android/app/src/main/assets/');
+    }
+
+    // Download if not found (for standard models)
     _updateStatus('Downloading ${modelType.modelName} model...');
     final bytes = await _downloadFile('$_modelDownloadBaseUrl/$bundledName');
     if (bytes != null && bytes.isNotEmpty) {

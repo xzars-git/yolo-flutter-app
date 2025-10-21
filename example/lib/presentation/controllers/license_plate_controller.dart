@@ -7,13 +7,14 @@ import '../../models/models.dart';
 import '../../services/model_manager.dart';
 import 'base_inference_controller.dart';
 
-/// Controller that manages the state and business logic for camera inference
-class CameraInferenceController extends BaseInferenceController {
+/// Controller that manages the state and business logic for license plate recognition
+class LicensePlateController extends BaseInferenceController {
   // Detection state
   int _detectionCount = 0;
   double _currentFps = 0.0;
   int _frameCount = 0;
   DateTime _lastFpsUpdate = DateTime.now();
+  List<YOLOResult> _lastResults = [];
 
   // Threshold state
   double _confidenceThreshold = 0.5;
@@ -21,8 +22,8 @@ class CameraInferenceController extends BaseInferenceController {
   int _numItemsThreshold = 30;
   SliderType _activeSlider = SliderType.none;
 
-  // Model state
-  ModelType _selectedModel = ModelType.detect;
+  // Model state - fixed to license plate recognition
+  final ModelType _selectedModel = ModelType.platRecognition;
   bool _isModelLoading = false;
   String? _modelPath;
   String _loadingMessage = '';
@@ -69,8 +70,9 @@ class CameraInferenceController extends BaseInferenceController {
   bool get isFrontCamera => _isFrontCamera;
   @override
   YOLOViewController get yoloController => _yoloController;
+  List<YOLOResult> get lastResults => _lastResults;
 
-  CameraInferenceController() {
+  LicensePlateController() {
     _modelManager = ModelManager(
       onDownloadProgress: (progress) {
         _downloadProgress = progress;
@@ -99,6 +101,7 @@ class CameraInferenceController extends BaseInferenceController {
   void onDetectionResults(List<YOLOResult> results) {
     if (_isDisposed) return;
 
+    _lastResults = results;
     _frameCount++;
     final now = DateTime.now();
     final elapsed = now.difference(_lastFpsUpdate).inMilliseconds;
@@ -202,15 +205,6 @@ class CameraInferenceController extends BaseInferenceController {
     if (_isFrontCamera) _currentZoomLevel = 1.0;
     _yoloController.switchCamera();
     notifyListeners();
-  }
-
-  void changeModel(ModelType model) {
-    if (_isDisposed) return;
-
-    if (!_isModelLoading && model != _selectedModel) {
-      _selectedModel = model;
-      _loadModelForPlatform();
-    }
   }
 
   Future<void> _loadModelForPlatform() async {

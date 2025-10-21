@@ -7,7 +7,8 @@ enum ModelType {
   segment('yolo11n-seg', YOLOTask.segment),
   classify('yolo11n-cls', YOLOTask.classify),
   pose('yolo11n-pose', YOLOTask.pose),
-  obb('yolo11n-obb', YOLOTask.obb);
+  obb('yolo11n-obb', YOLOTask.obb),
+  platRecognition('plat_recognation', YOLOTask.detect);
 
   final String modelName;
 

@@ -112,6 +112,41 @@ class YOLOStreamingConfig {
   /// `inferenceFrequency` takes precedence.
   final int? skipFrames;
 
+  /// Whether to enable automatic cropping of detected objects.
+  ///
+  /// When enabled, each detected bounding box will be automatically cropped
+  /// from the original image. Cropped images are provided without overlays
+  /// or labels, making them suitable for OCR or secondary analysis.
+  ///
+  /// Use case examples:
+  /// - License plate recognition: Detect plate → Crop → Send to OCR
+  /// - Text extraction: Detect text region → Crop → Process with ML Kit
+  /// - Object classification: Detect object → Crop → Secondary classifier
+  final bool enableCropping;
+
+  /// Padding percentage for cropped images (0.0 - 1.0).
+  ///
+  /// Adds extra padding around detected bounding boxes when cropping.
+  /// This can improve OCR/classification accuracy by including context.
+  ///
+  /// Examples:
+  /// - `0.0`: No padding, exact bounding box
+  /// - `0.1`: 10% padding (default, recommended for OCR)
+  /// - `0.2`: 20% padding (more context)
+  /// - `0.5`: 50% padding (maximum recommended)
+  final double croppingPadding;
+
+  /// JPEG quality for cropped images (1-100).
+  ///
+  /// Controls the compression quality of cropped image data.
+  /// Higher values produce better quality but larger file sizes.
+  ///
+  /// Recommendations:
+  /// - `90-95`: High quality for OCR (default: 90)
+  /// - `80-89`: Balanced quality/size
+  /// - `70-79`: Lower quality, smaller size
+  final int croppingQuality;
+
   /// Creates a YOLOStreamingConfig with custom settings.
   ///
   /// This constructor allows full customization of streaming behavior.
@@ -129,6 +164,9 @@ class YOLOStreamingConfig {
     this.throttleInterval,
     this.inferenceFrequency,
     this.skipFrames,
+    this.enableCropping = false,
+    this.croppingPadding = 0.1,
+    this.croppingQuality = 90,
   });
 
   /// Creates a minimal configuration optimized for maximum performance.
@@ -155,7 +193,10 @@ class YOLOStreamingConfig {
       maxFPS = null,
       throttleInterval = null,
       inferenceFrequency = null,
-      skipFrames = null;
+      skipFrames = null,
+      enableCropping = false,
+      croppingPadding = 0.1,
+      croppingQuality = 90;
 
   /// Creates a custom configuration with specified parameters.
   ///
@@ -182,6 +223,9 @@ class YOLOStreamingConfig {
     this.throttleInterval,
     this.inferenceFrequency,
     this.skipFrames,
+    bool? enableCropping,
+    double? croppingPadding,
+    int? croppingQuality,
   }) : includeDetections = includeDetections ?? true,
        includeClassifications = includeClassifications ?? true,
        includeProcessingTimeMs = includeProcessingTimeMs ?? true,
@@ -189,7 +233,10 @@ class YOLOStreamingConfig {
        includeMasks = includeMasks ?? false,
        includePoses = includePoses ?? false,
        includeOBB = includeOBB ?? false,
-       includeOriginalImage = includeOriginalImage ?? false;
+       includeOriginalImage = includeOriginalImage ?? false,
+       enableCropping = enableCropping ?? false,
+       croppingPadding = croppingPadding ?? 0.1,
+       croppingQuality = croppingQuality ?? 90;
 
   /// Creates a configuration with segmentation masks.
   ///
@@ -209,7 +256,10 @@ class YOLOStreamingConfig {
       maxFPS = null,
       throttleInterval = null,
       inferenceFrequency = null,
-      skipFrames = null;
+      skipFrames = null,
+      enableCropping = false,
+      croppingPadding = 0.1,
+      croppingQuality = 90;
 
   /// Creates a configuration with pose keypoints.
   ///
@@ -229,7 +279,10 @@ class YOLOStreamingConfig {
       maxFPS = null,
       throttleInterval = null,
       inferenceFrequency = null,
-      skipFrames = null;
+      skipFrames = null,
+      enableCropping = false,
+      croppingPadding = 0.1,
+      croppingQuality = 90;
 
   /// Creates a full configuration with all data included.
   ///
@@ -255,7 +308,10 @@ class YOLOStreamingConfig {
       maxFPS = null,
       throttleInterval = null,
       inferenceFrequency = null,
-      skipFrames = null;
+      skipFrames = null,
+      enableCropping = false,
+      croppingPadding = 0.1,
+      croppingQuality = 90;
 
   /// Creates a debug configuration with all data and images.
   ///
@@ -278,7 +334,10 @@ class YOLOStreamingConfig {
       maxFPS = null,
       throttleInterval = null,
       inferenceFrequency = null,
-      skipFrames = null;
+      skipFrames = null,
+      enableCropping = false,
+      croppingPadding = 0.1,
+      croppingQuality = 90;
 
   /// Creates a throttled configuration with specified FPS limit.
   ///

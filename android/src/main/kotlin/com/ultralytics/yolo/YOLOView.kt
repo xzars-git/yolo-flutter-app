@@ -31,6 +31,8 @@ import android.view.Gravity
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import android.content.res.Configuration
+import com.ultralytics.yolo.utils.ImageCropper
+import java.util.concurrent.ConcurrentHashMap
 
 class YOLOView @JvmOverloads constructor(
     context: Context,
@@ -39,6 +41,17 @@ class YOLOView @JvmOverloads constructor(
 
     // Lifecycle owner for camera
     private var lifecycleOwner: LifecycleOwner? = null
+    
+    // NEW: Cropping configuration
+    private var enableCropping: Boolean = false
+    private var croppingPadding: Float = 0.1f  // 10% padding default
+    private var croppingQuality: Int = 90       // JPEG quality for cropped images
+    
+    // NEW: Store cropped images temporarily
+    private val croppedImagesCache = ConcurrentHashMap<String, ByteArray>()
+    
+    // NEW: Callback untuk cropped images
+    var onCroppedImagesReady: ((List<Map<String, Any>>) -> Unit)? = null
 
     companion object {
         private const val REQUEST_CODE_PERMISSIONS = 10
@@ -392,6 +405,123 @@ class YOLOView @JvmOverloads constructor(
     }
 
     // endregion
+    
+    // region Cropping Control
+    
+    /**
+     * Enable/disable automatic cropping of detected objects
+     */
+    fun setEnableCropping(enable: Boolean) {
+        enableCropping = enable
+        Log.d(TAG, "Cropping ${if (enable) "enabled" else "disabled"}")
+    }
+    
+    /**
+     * Set padding percentage untuk cropping (0.0 - 1.0)
+     */
+    fun setCroppingPadding(padding: Float) {
+        croppingPadding = padding.coerceIn(0f, 1f)
+        Log.d(TAG, "Cropping padding set to: $croppingPadding")
+    }
+    
+    /**
+     * Set JPEG quality untuk cropped images (0-100)
+     */
+    fun setCroppingQuality(quality: Int) {
+        croppingQuality = quality.coerceIn(1, 100)
+        Log.d(TAG, "Cropping quality set to: $croppingQuality")
+    }
+    
+    /**
+     * Process cropping asynchronously untuk avoid blocking camera stream
+     */
+    private fun processCroppingAsync(result: YOLOResult) {
+        Executors.newSingleThreadExecutor().execute {
+            try {
+                val originalBitmap = result.originalImage ?: run {
+                    Log.w(TAG, "Cannot crop: originalImage is null")
+                    return@execute
+                }
+                
+                // Convert List<Box> to List<RectF> for cropping
+                val boundingBoxes = result.boxes.map { box -> box.xywh }
+                
+                // Crop all detected boxes
+                val croppedResults = ImageCropper.cropMultipleBoundingBoxes(
+                    originalBitmap,
+                    boundingBoxes,
+                    croppingPadding,
+                    useNormalizedCoords = false // YOLOResult boxes are in pixel coordinates
+                )
+                
+                if (croppedResults.isEmpty()) {
+                    Log.d(TAG, "No valid crops produced")
+                    return@execute
+                }
+                
+                // Convert bitmaps to byte arrays
+                val croppedImageData = mutableListOf<Map<String, Any>>()
+                
+                croppedResults.forEachIndexed { index, croppedBitmap ->
+                    val box = result.boxes[index]
+                    val byteArray = ImageCropper.bitmapToByteArray(croppedBitmap, croppingQuality)
+                    
+                    // Store in cache with unique key
+                    val cacheKey = "crop_${System.currentTimeMillis()}_$index"
+                    croppedImagesCache[cacheKey] = byteArray
+                    
+                    // Create data map
+                    val cropData = mapOf(
+                        "cacheKey" to cacheKey,
+                        "width" to croppedBitmap.width,
+                        "height" to croppedBitmap.height,
+                        "sizeBytes" to byteArray.size,
+                        "confidence" to box.conf.toDouble(),
+                        "cls" to box.index,
+                        "clsName" to box.cls,
+                        "originalBox" to mapOf(
+                            "x1" to box.xywh.left.toDouble(),
+                            "y1" to box.xywh.top.toDouble(),
+                            "x2" to box.xywh.right.toDouble(),
+                            "y2" to box.xywh.bottom.toDouble()
+                        )
+                    )
+                    
+                    croppedImageData.add(cropData)
+                    
+                    // Clean up bitmap
+                    if (croppedBitmap != originalBitmap) {
+                        croppedBitmap.recycle()
+                    }
+                }
+                
+                // Clear old cache entries if too many
+                if (croppedImagesCache.size > 50) {
+                    val keysToRemove = croppedImagesCache.keys.take(croppedImagesCache.size - 50)
+                    keysToRemove.forEach { croppedImagesCache.remove(it) }
+                }
+                
+                // Invoke callback on main thread
+                post {
+                    onCroppedImagesReady?.invoke(croppedImageData)
+                }
+                
+                Log.d(TAG, "Cropped ${croppedResults.size} images successfully")
+                
+            } catch (e: Exception) {
+                Log.e(TAG, "Error during cropping", e)
+            }
+        }
+    }
+    
+    /**
+     * Get cropped image from cache by key
+     */
+    fun getCroppedImageFromCache(cacheKey: String): ByteArray? {
+        return croppedImagesCache[cacheKey]
+    }
+    
+    // endregion
 
     // region Model / Task
 
@@ -680,6 +810,11 @@ class YOLOView @JvmOverloads constructor(
                     } else {
                         Log.d(TAG, "Skipping frame output due to throttling")
                     }
+                }
+                
+                // Process cropping if enabled and detections exist
+                if (enableCropping && result.boxes.isNotEmpty()) {
+                    processCroppingAsync(resultWithOriginalImage)
                 }
 
                 // Update overlay

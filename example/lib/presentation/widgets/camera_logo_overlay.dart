@@ -1,7 +1,7 @@
 // Ultralytics 🚀 AGPL-3.0 License - https://ultralytics.com/license
 
 import 'package:flutter/material.dart';
-import '../controllers/camera_inference_controller.dart';
+import '../controllers/base_inference_controller.dart';
 
 /// Center logo overlay widget
 class CameraLogoOverlay extends StatelessWidget {
@@ -11,7 +11,7 @@ class CameraLogoOverlay extends StatelessWidget {
     required this.isLandscape,
   });
 
-  final CameraInferenceController controller;
+  final BaseInferenceController controller;
   final bool isLandscape;
 
   @override
