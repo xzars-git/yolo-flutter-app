@@ -928,14 +928,39 @@ class YOLOView @JvmOverloads constructor(
             Log.d(TAG, "OverlayView initialized with enhanced Z-order + hardware acceleration")
         }
 
+        // 🔥 DEBUG: Global counter for onDraw calls
+        private var drawCallCounter = 0
+        
         override fun onDraw(canvas: Canvas) {
             super.onDraw(canvas)
-            val result = inferenceResult ?: return
+            
+            // 🔥 DEBUG: Log every onDraw call
+            drawCallCounter++
+            Log.d(TAG, "")
+            Log.d(TAG, "🖼️ ========================================")
+            Log.d(TAG, "🖼️ === onDraw() CALLED #$drawCallCounter ===")
+            Log.d(TAG, "🖼️ Time: ${System.currentTimeMillis()}")
+            
+            val result = inferenceResult ?: run {
+                Log.d(TAG, "🖼️ inferenceResult is NULL, skipping draw")
+                Log.d(TAG, "🖼️ ========================================")
+                Log.d(TAG, "")
+                return
+            }
+            
+            Log.d(TAG, "🖼️ inferenceResult has ${result.boxes.size} box(es)")
             
             // Only draw overlays if showOverlays is true
             if (!showOverlays) {
+                Log.d(TAG, "🖼️ showOverlays=false, skipping draw")
+                Log.d(TAG, "🖼️ ========================================")
+                Log.d(TAG, "")
                 return
             }
+            
+            Log.d(TAG, "🖼️ showOverlays=true, proceeding to draw...")
+            Log.d(TAG, "🖼️ ========================================")
+            Log.d(TAG, "")
 
             val iw = result.origShape.width.toFloat()
             val ih = result.origShape.height.toFloat()
@@ -979,7 +1004,23 @@ class YOLOView @JvmOverloads constructor(
                         Log.d(TAG, "Box pixel coords: (${firstBox.xywh.left}, ${firstBox.xywh.top}, ${firstBox.xywh.right}, ${firstBox.xywh.bottom})")
                     }
                     
-                    for (box in result.boxes) {
+                    // 🔥 DEBUG: Log drawing details
+                    Log.d(TAG, "")
+                    Log.d(TAG, "🎨 ========================================")
+                    Log.d(TAG, "🎨 === OVERLAY DRAWING DEBUG ===")
+                    Log.d(TAG, "🎨 onDraw() called at ${System.currentTimeMillis()}")
+                    Log.d(TAG, "🎨 Total boxes to draw: ${result.boxes.size}")
+                    Log.d(TAG, "🎨 isFrontCamera: $isFrontCamera")
+                    Log.d(TAG, "🎨 Canvas size: ${canvas.width} x ${canvas.height}")
+                    Log.d(TAG, "🎨 View size: $vw x $vh")
+                    Log.d(TAG, "🎨 Scale: $scale, dx: $dx, dy: $dy")
+                    Log.d(TAG, "🎨 ========================================")
+                    
+                    for ((boxIndex, box) in result.boxes.withIndex()) {
+                        Log.d(TAG, "")
+                        Log.d(TAG, "🎨 Drawing box[$boxIndex]: ${box.cls} conf=${box.conf}")
+                        Log.d(TAG, "🎨   Original xywh: L=${box.xywh.left}, T=${box.xywh.top}, R=${box.xywh.right}, B=${box.xywh.bottom}")
+                        
                         val alpha = (box.conf * 255).toInt().coerceIn(0, 255)
                         val baseColor = ultralyticsColors[box.index % ultralyticsColors.size]
                         val newColor = Color.argb(
@@ -996,11 +1037,25 @@ class YOLOView @JvmOverloads constructor(
                         var right = box.xywh.right * scale + dx
                         var bottom = box.xywh.bottom * scale + dy
                         
-                        // Ensure coordinates are within view bounds and maintain aspect ratio
+                        Log.d(TAG, "🎨   After scaling: L=$left, T=$top, R=$right, B=$bottom")
+                        
+                        // 🔥 FIX: Flip horizontally for front camera BEFORE clamping
+                        // This ensures the coordinates are in the correct orientation before adjustment
+                        if (isFrontCamera) {
+                            val flippedLeft = vw - right
+                            val flippedRight = vw - left
+                            left = flippedLeft
+                            right = flippedRight
+                            Log.d(TAG, "🎨   After flip: L=$left, T=$top, R=$right, B=$bottom")
+                        }
+                        
+                        // Calculate box dimensions AFTER flipping (if needed)
                         val boxWidth = right - left
                         val boxHeight = bottom - top
                         
-                        // Adjust coordinates to maintain aspect ratio and stay within bounds
+                        Log.d(TAG, "🎨   Box dimensions: W=$boxWidth, H=$boxHeight")
+                        
+                        // Now clamp coordinates to view bounds and maintain aspect ratio
                         if (left < 0) {
                             left = 0f
                             right = left + boxWidth
@@ -1018,15 +1073,8 @@ class YOLOView @JvmOverloads constructor(
                             top = bottom - boxHeight
                         }
                         
-                        // Flip horizontally for front camera (DETECT task)
-                        if (isFrontCamera) {
-                            val flippedLeft = vw - right
-                            val flippedRight = vw - left
-                            left = flippedLeft
-                            right = flippedRight
-                        }
-                        
-                        Log.d(TAG, "Drawing box for ${box.cls}: L=$left, T=$top, R=$right, B=$bottom, conf=${box.conf}")
+                        Log.d(TAG, "🎨   FINAL coords (after clamp): L=$left, T=$top, R=$right, B=$bottom")
+                        Log.d(TAG, "🎨   Drawing to canvas...")
 
                         paint.color = newColor
                         paint.style = Paint.Style.STROKE
@@ -1075,6 +1123,12 @@ class YOLOView @JvmOverloads constructor(
                         val baseline = centerY - (fm.descent + fm.ascent) / 2
                         canvas.drawText(labelText, bgRect.left + pad, baseline, paint)
                     }
+                    
+                    // 🔥 DEBUG: Log end of DETECT drawing
+                    Log.d(TAG, "")
+                    Log.d(TAG, "🎨 ✅ Finished drawing ${result.boxes.size} box(es) for DETECT task")
+                    Log.d(TAG, "🎨 ========================================")
+                    Log.d(TAG, "")
                 }
                 // ----------------------------------------
                 // SEGMENT

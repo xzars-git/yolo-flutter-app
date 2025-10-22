@@ -15,8 +15,11 @@ class CroppingExampleScreen extends StatefulWidget {
 class _CroppingExampleScreenState extends State<CroppingExampleScreen> {
   List<YOLOCroppedImage> _croppedImages = [];
   int _totalCropped = 0;
-  int _totalDetected = 0;
+  int _totalDetections = 0;
   String _statusMessage = 'Loading model...';
+  bool _enableCropping = true;
+  double _croppingPadding = 0.1;
+  int _croppingQuality = 85;
   
   @override
   void initState() {
@@ -26,15 +29,6 @@ class _CroppingExampleScreenState extends State<CroppingExampleScreen> {
       if (mounted) {
         setState(() {
           _statusMessage = 'Model loaded. Arahkan kamera ke plat nomor...';
-        });
-      }
-    });
-    
-    // Add a timeout check for cropping
-    Future.delayed(const Duration(seconds: 30), () {
-      if (mounted && _totalCropped == 0 && _totalDetected > 0) {
-        setState(() {
-          _statusMessage = 'Cropping timeout. Try adjusting camera angle or lighting.';
         });
       }
     });
@@ -59,7 +53,7 @@ class _CroppingExampleScreenState extends State<CroppingExampleScreen> {
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    _buildStatItem('Detected', _totalDetected.toString()),
+                    _buildStatItem('Detected', _totalDetections.toString()),
                     _buildStatItem('Cropped', _totalCropped.toString()),
                     _buildStatItem('In Memory', _croppedImages.length.toString()),
                   ],
@@ -77,63 +71,114 @@ class _CroppingExampleScreenState extends State<CroppingExampleScreen> {
             ),
           ),
 
+          // Cropping controls
+          Container(
+            padding: const EdgeInsets.all(12),
+            color: Colors.white,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Enable cropping switch
+                SwitchListTile(
+                  title: const Text('Enable Cropping'),
+                  subtitle: Text(_enableCropping ? 'Enabled' : 'Disabled'),
+                  value: _enableCropping,
+                  activeColor: Colors.green,
+                  onChanged: (value) {
+                    setState(() {
+                      _enableCropping = value;
+                    });
+                  },
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                ),
+                const SizedBox(height: 8),
+                
+                // Padding slider
+                Text(
+                  'Padding: ${(_croppingPadding * 100).toInt()}%',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Slider(
+                  value: _croppingPadding,
+                  min: 0.0,
+                  max: 0.5,
+                  divisions: 10,
+                  activeColor: Colors.green,
+                  label: '${(_croppingPadding * 100).toInt()}%',
+                  onChanged: (value) {
+                    setState(() {
+                      _croppingPadding = value;
+                    });
+                  },
+                ),
+                
+                // Quality slider
+                Text(
+                  'Quality: $_croppingQuality',
+                  style: const TextStyle(fontSize: 14),
+                ),
+                Slider(
+                  value: _croppingQuality.toDouble(),
+                  min: 50,
+                  max: 100,
+                  divisions: 10,
+                  activeColor: Colors.green,
+                  label: '$_croppingQuality',
+                  onChanged: (value) {
+                    setState(() {
+                      _croppingQuality = value.toInt();
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+
           // Camera view with cropping enabled
           Expanded(
             flex: 2,
             child: YOLOView(
-              modelPath: 'plat_recognation.tflite', // Use license plate model
+              modelPath: 'plat_recognation.tflite',
               task: YOLOTask.detect,
-              confidenceThreshold: 0.25, // Even lower threshold for better detection
+              confidenceThreshold: 0.25,
               
-              // 🔥 Enable cropping feature - with original image
-              streamingConfig: const YOLOStreamingConfig(
-                enableCropping: true,
+              // 🔥 Enable cropping with configurable parameters
+              streamingConfig: YOLOStreamingConfig(
+                enableCropping: _enableCropping,
                 includeDetections: true,
-                includeOriginalImage: true, // IMPORTANT: Required for cropping!
-                croppingPadding: 0.1,
-                croppingQuality: 85,
+                includeOriginalImage: true, // REQUIRED for cropping!
+                croppingPadding: _croppingPadding,
+                croppingQuality: _croppingQuality,
               ),
               
               // Handle cropped license plates
               onCroppedImages: (List<YOLOCroppedImage> images) {
-                // Debug: onCroppedImages called with ${images.length} images
-                
                 if (images.isNotEmpty) {
                   setState(() {
                     _totalCropped += images.length;
-                    // Keep only last 9 cropped images
                     _croppedImages.addAll(images);
                     if (_croppedImages.length > 9) {
                       _croppedImages = _croppedImages.skip(_croppedImages.length - 9).toList();
                     }
-                    
-                    // Update status message
                     _statusMessage = 'Berhasil crop ${images.length} plat! Total: $_totalCropped';
                   });
-
-                  // Successfully processed ${images.length} cropped images
-                } else {
-                  // Warning: onCroppedImages called but no images received
                 }
               },
               
               // Handle regular detection results
               onResult: (List<YOLOResult> results) {
-                // Debug: onResult called with ${results.length} detections
-                
-                setState(() {
-                  _totalDetected += results.length;
-                  
-                  if (results.isEmpty) {
-                    _statusMessage = 'Arahkan kamera ke plat nomor kendaraan...';
-                  } else {
-                    // Show confidence of first detection
+                if (results.isNotEmpty) {
+                  setState(() {
+                    _totalDetections += results.length;
                     final firstConf = results.first.confidence;
-                    _statusMessage = '${results.length} plat terdeteksi (${(firstConf * 100).toStringAsFixed(1)}%) - processing...';
-                  }
-                });
-                
-                // Detection details logged: ${results.length} items processed
+                    _statusMessage = '${results.length} plat terdeteksi (${(firstConf * 100).toStringAsFixed(1)}%)';
+                  });
+                } else {
+                  setState(() {
+                    _statusMessage = 'Arahkan kamera ke plat nomor...';
+                  });
+                }
               },
             ),
           ),
@@ -161,38 +206,19 @@ class _CroppingExampleScreenState extends State<CroppingExampleScreen> {
                           ),
                         ),
                         const Spacer(),
-                        Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            TextButton.icon(
-                              onPressed: () {
-                                setState(() {
-                                  _croppedImages.clear();
-                                  _totalCropped = 0;
-                                  _totalDetected = 0;
-                                });
-                              },
-                              icon: const Icon(Icons.refresh, size: 16),
-                              label: const Text('Reset'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.white70,
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: () {
-                                // Debug: Add a fake cropped image to test UI
-                                setState(() {
-                                  _statusMessage = 'Debug: Added test image';
-                                });
-                                // Debug: Testing cropping functionality
-                              },
-                              icon: const Icon(Icons.bug_report, size: 16),
-                              label: const Text('Debug'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.yellow.shade300,
-                              ),
-                            ),
-                          ],
+                        TextButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _croppedImages.clear();
+                              _totalCropped = 0;
+                              _totalDetections = 0;
+                            });
+                          },
+                          icon: const Icon(Icons.refresh, size: 16),
+                          label: const Text('Reset'),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white70,
+                          ),
                         ),
                       ],
                     ),

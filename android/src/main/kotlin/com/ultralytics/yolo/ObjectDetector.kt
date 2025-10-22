@@ -340,13 +340,16 @@ class ObjectDetector(
             numClasses = labels.size
         )
         
-        // 🔥 DEBUG: Log detection results before NMS
-        Log.d(TAG, "=== DETECTION RESULTS (Post-NMS) ===")
-        Log.d(TAG, "Total detections after NMS: ${resultBoxes.size}")
+        // 🔥 DEBUG: Log detection results after native NMS
+        Log.d(TAG, "")
+        Log.d(TAG, "========================================")
+        Log.d(TAG, "=== DETECTION RESULTS (After Native NMS) ===")
+        Log.d(TAG, "Total detections from native code: ${resultBoxes.size}")
         
         for ((index, boxArray) in resultBoxes.withIndex()) {
-            Log.d(TAG, "Detection[$index]: x=${boxArray[0]}, y=${boxArray[1]}, w=${boxArray[2]}, h=${boxArray[3]}, conf=${boxArray[4]}, cls=${boxArray[5].toInt()}")
+            Log.d(TAG, "  Native[$index]: conf=${boxArray[4]}, cls=${boxArray[5].toInt()}, x=${boxArray[0]}, y=${boxArray[1]}, w=${boxArray[2]}, h=${boxArray[3]}")
         }
+        Log.d(TAG, "========================================")
         // Convert to Box list
         val boxes = mutableListOf<Box>()
         for (boxArray in resultBoxes) {
@@ -378,6 +381,31 @@ class ObjectDetector(
                 }
             }
         }
+        
+        // 🔥 Log boxes before deduplication
+        Log.d(TAG, "")
+        Log.d(TAG, "========================================")
+        Log.d(TAG, "=== BOXES BEFORE DEDUPLICATION ===")
+        Log.d(TAG, "Total boxes created: ${boxes.size}")
+        for ((index, box) in boxes.withIndex()) {
+            Log.d(TAG, "  Box[$index]: ${box.cls} conf=${box.conf}, xywh=[${box.xywh.left}, ${box.xywh.top}, ${box.xywh.right}, ${box.xywh.bottom}]")
+        }
+        Log.d(TAG, "========================================")
+        
+        // 🔥 ADDITIONAL POST-PROCESSING: Remove duplicate detections
+        // This is a safety layer on top of NMS to ensure no duplicates
+        val deduplicatedBoxes = removeDuplicateDetections(boxes)
+        
+        // 🔥 Log boxes after deduplication
+        Log.d(TAG, "")
+        Log.d(TAG, "========================================")
+        Log.d(TAG, "=== BOXES AFTER DEDUPLICATION ===")
+        Log.d(TAG, "Total boxes remaining: ${deduplicatedBoxes.size}")
+        for ((index, box) in deduplicatedBoxes.withIndex()) {
+            Log.d(TAG, "  Box[$index]: ${box.cls} conf=${box.conf}, xywh=[${box.xywh.left}, ${box.xywh.top}, ${box.xywh.right}, ${box.xywh.bottom}]")
+        }
+        Log.d(TAG, "========================================")
+        Log.d(TAG, "")
 
         // val postEnd = System.nanoTime() // This was previously here, now using stageStartTime for end of postprocess
         var postprocessTimeMs = (System.nanoTime() - stageStartTime) / 1_000_000.0
@@ -390,7 +418,7 @@ class ObjectDetector(
 
         return YOLOResult(
             origShape = com.ultralytics.yolo.Size(origWidth, origHeight),
-            boxes = boxes,
+            boxes = deduplicatedBoxes,  // 🔥 Use deduplicated boxes instead
             speed = totalMs, // Actual processing time in milliseconds for this frame
             fps = if (t4 > 0.0) 1.0 / t4 else 0.0, // Smoothed FPS from BasePredictor (t4 is smoothed dt)
             names = labels
@@ -434,6 +462,88 @@ class ObjectDetector(
         numItemsThreshold: Int,
         numClasses: Int
     ): Array<FloatArray>
+
+    /**
+     * 🔥 FIX: Additional post-processing to remove duplicate detections
+     * This function removes boxes that have high overlap (IoU > 0.15) with the same class
+     * and keeps only the box with highest confidence.
+     * This is a safety layer on top of native NMS.
+     */
+    private fun removeDuplicateDetections(boxes: List<Box>): List<Box> {
+        if (boxes.size <= 1) {
+            Log.d(TAG, "🔍 Deduplication skipped: ${boxes.size} box(es) only")
+            return boxes
+        }
+        
+        Log.d(TAG, "")
+        Log.d(TAG, "🔍 ========================================")
+        Log.d(TAG, "🔍 === STARTING DEDUPLICATION PROCESS ===")
+        Log.d(TAG, "🔍 Input: ${boxes.size} boxes")
+        
+        // Sort by confidence (highest first)
+        val sortedBoxes = boxes.sortedByDescending { it.conf }
+        Log.d(TAG, "🔍 Sorted by confidence (highest first)")
+        for ((i, box) in sortedBoxes.withIndex()) {
+            Log.d(TAG, "🔍   Sorted[$i]: ${box.cls} conf=${box.conf}")
+        }
+        
+        val keep = mutableListOf<Box>()
+        
+        for ((index, box) in sortedBoxes.withIndex()) {
+            var shouldKeep = true
+            Log.d(TAG, "🔍 ")
+            Log.d(TAG, "🔍 Checking box[$index]: ${box.cls} conf=${box.conf}")
+            
+            // Check against all boxes we're keeping
+            for ((keptIndex, keptBox) in keep.withIndex()) {
+                // Only compare boxes of the same class
+                if (box.cls == keptBox.cls) {
+                    val iou = computeIoU(box.xywh, keptBox.xywh)
+                    Log.d(TAG, "🔍   vs kept[$keptIndex]: ${keptBox.cls} conf=${keptBox.conf}, IoU=$iou")
+                    
+                    // 🔥 VERY AGGRESSIVE: IoU > 0.15 means duplicate
+                    if (iou > 0.15f) {
+                        shouldKeep = false
+                        Log.w(TAG, "🗑️ REMOVING: ${box.cls} conf=${box.conf} (IoU=$iou > 0.15 with kept box conf=${keptBox.conf})")
+                        break
+                    }
+                } else {
+                    Log.d(TAG, "🔍   vs kept[$keptIndex]: Different class (${keptBox.cls}), skip comparison")
+                }
+            }
+            
+            if (shouldKeep) {
+                keep.add(box)
+                Log.d(TAG, "✅ KEEPING: ${box.cls} conf=${box.conf}")
+            }
+        }
+        
+        Log.d(TAG, "🔍 ")
+        Log.d(TAG, "✅ Deduplication complete: ${boxes.size} → ${keep.size} boxes")
+        Log.d(TAG, "✅ Removed: ${boxes.size - keep.size} duplicates")
+        Log.d(TAG, "🔍 ========================================")
+        return keep
+    }
+    
+    /**
+     * Compute Intersection over Union (IoU) between two bounding boxes
+     */
+    private fun computeIoU(a: RectF, b: RectF): Float {
+        val intersectionLeft = kotlin.math.max(a.left, b.left)
+        val intersectionTop = kotlin.math.max(a.top, b.top)
+        val intersectionRight = kotlin.math.min(a.right, b.right)
+        val intersectionBottom = kotlin.math.min(a.bottom, b.bottom)
+        
+        val intersectionWidth = kotlin.math.max(0f, intersectionRight - intersectionLeft)
+        val intersectionHeight = kotlin.math.max(0f, intersectionBottom - intersectionTop)
+        val intersectionArea = intersectionWidth * intersectionHeight
+        
+        val areaA = a.width() * a.height()
+        val areaB = b.width() * b.height()
+        val unionArea = areaA + areaB - intersectionArea
+        
+        return if (unionArea > 0f) intersectionArea / unionArea else 0f
+    }
 
     companion object {
         private const val TAG = "ObjectDetector"

@@ -45,3 +45,13 @@ app.*.map.json
 /android/app/release
 
 .vscode/templates
+
+# Windows reserved filenames (cannot be committed on Windows)
+con
+CON
+prn
+PRN
+aux
+AUX
+nul
+NUL

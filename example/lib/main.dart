@@ -5,6 +5,7 @@ import 'package:ultralytics_yolo_example/presentation/screens/camera_inference_s
 import 'package:ultralytics_yolo_example/presentation/cropping_example_screen.dart';
 import 'package:ultralytics_yolo_example/presentation/screens/license_plate_screen.dart';
 import 'package:ultralytics_yolo_example/presentation/screens/license_plate_cropping_screen.dart';
+import 'package:ultralytics_yolo_example/presentation/screens/simple_ocr_test_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -16,7 +17,7 @@ class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'YOLO Examples',
+      title: 'YOLO Examples', 
       theme: ThemeData(
         primarySwatch: Colors.blue,
         useMaterial3: true,
@@ -84,6 +85,23 @@ class HomeScreen extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const LicensePlateCroppingScreen(),
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 16),
+          _buildExampleCard(
+            context,
+            icon: Icons.science,
+            title: '🧪 Simple OCR Test',
+            description: 'Test OCR tanpa pause logic - untuk debugging',
+            color: Colors.purple,
+            badge: 'DEBUG',
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SimpleOCRTestScreen(),
                 ),
               );
             },
