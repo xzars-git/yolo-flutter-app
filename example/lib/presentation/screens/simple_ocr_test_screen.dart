@@ -3,8 +3,9 @@
 
 import 'package:flutter/material.dart';
 import 'package:ultralytics_yolo/ultralytics_yolo.dart';
-import '../../services/ocr_service.dart';
-import '../../services/pajak_service.dart';
+import '../../features/ocr_plat_nomor/services/ocr_service.dart';
+import '../../features/ocr_plat_nomor/services/pajak_service.dart';
+import '../../app/theme.dart';
 
 class SimpleOCRTestScreen extends StatefulWidget {
   const SimpleOCRTestScreen({super.key});
@@ -25,7 +26,6 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
   // ✅ PAUSE LOGIC: Stop detection after success
   bool _isDetectionActive = true;
   bool _isProcessing = false;
-  String? _lastProcessedPlate;  // Track last successful plate for debugging
 
   @override
   void initState() {
@@ -157,18 +157,22 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
       context: context,
       barrierDismissible: false,  // User HARUS pilih salah satu button
       builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        ),
         title: Row(
           children: [
             Icon(
               isSuccess ? Icons.check_circle : Icons.error,
-              color: isSuccess ? Colors.green : Colors.red,
+              color: isSuccess ? AppTheme.successColor : AppTheme.errorColor,
+              size: 28,
             ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 12),
             Expanded(
               child: Text(
                 isSuccess ? 'Data Ditemukan!' : 'Data Tidak Ditemukan',
-                style: TextStyle(
-                  color: isSuccess ? Colors.green : Colors.red,
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: isSuccess ? AppTheme.successColor : AppTheme.errorColor,
                 ),
               ),
             ),
@@ -181,47 +185,61 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
             children: [
               // Plat Nomor (SELALU TAMPIL)
               Container(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppTheme.paddingM),
                 decoration: BoxDecoration(
-                  color: Colors.blue.shade50,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.blue, width: 2),
+                  gradient: LinearGradient(
+                    colors: [AppTheme.blue50, AppTheme.blue100],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                  border: Border.all(color: AppTheme.blue600, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppTheme.blue600.withOpacity(0.2),
+                      blurRadius: 8,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
                 ),
                 child: Center(
                   child: Text(
                     platNomor,
-                    style: const TextStyle(
-                      fontSize: 32,
+                    style: Theme.of(context).textTheme.displayMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       letterSpacing: 4,
-                      color: Colors.black,
+                      color: AppTheme.blue900,
                     ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: AppTheme.paddingM),
 
               // Message dari API
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(AppTheme.paddingS),
                 decoration: BoxDecoration(
-                  color: isSuccess ? Colors.green.shade50 : Colors.red.shade50,
-                  borderRadius: BorderRadius.circular(8),
+                  color: isSuccess ? AppTheme.green50 : AppTheme.red50,
+                  borderRadius: BorderRadius.circular(AppTheme.radiusXS),
+                  border: Border.all(
+                    color: isSuccess ? AppTheme.green600 : AppTheme.red600,
+                    width: 1,
+                  ),
                 ),
                 child: Row(
                   children: [
                     Icon(
-                      isSuccess ? Icons.info : Icons.warning,
-                      color: isSuccess ? Colors.green : Colors.red,
+                      isSuccess ? Icons.info_outline : Icons.warning_amber_outlined,
+                      color: isSuccess ? AppTheme.green700 : AppTheme.red700,
                       size: 20,
                     ),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         pajakInfo.message,
-                        style: TextStyle(
-                          color: isSuccess ? Colors.green.shade900 : Colors.red.shade900,
-                          fontWeight: FontWeight.bold,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: isSuccess ? AppTheme.green900 : AppTheme.red900,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
                     ),
@@ -231,57 +249,64 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
 
               // Data kendaraan (HANYA jika success)
               if (isSuccess && data != null) ...[
-                const Divider(height: 24),
-                const Text(
+                Divider(height: 24, color: AppTheme.gray300),
+                Text(
                   '📋 Informasi Kendaraan',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.gray900,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildInfoRow('Pemilik', namaPemilik),
                 _buildInfoRow('Alamat', alamat, maxLines: 2),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppTheme.paddingS),
                 _buildInfoRow('Merk', merkKB),
                 _buildInfoRow('Model', modelKB),
                 _buildInfoRow('Warna', warnaKB),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppTheme.paddingS),
                 _buildInfoRow('No. Rangka', noRangka),
                 _buildInfoRow('No. Mesin', noMesin),
-                const SizedBox(height: 8),
+                const SizedBox(height: AppTheme.paddingS),
                 _buildInfoRow('Jatuh Tempo Pajak', tglAkhirPajak),
                 _buildInfoRow('Jatuh Tempo STNK', tglAkhirSTNK),
 
-                const Divider(height: 24),
-                const Text(
+                Divider(height: 24, color: AppTheme.gray300),
+                Text(
                   '💰 Informasi Pajak',
-                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: AppTheme.gray900,
+                  ),
                 ),
                 const SizedBox(height: 12),
                 _buildInfoRow('PKB Pokok', 'Rp ${_formatCurrency(pajakPokok)}'),
                 _buildInfoRow('SWDKLLJ', 'Rp ${_formatCurrency(swdkllj)}'),
                 Container(
-                  margin: const EdgeInsets.only(top: 8),
-                  padding: const EdgeInsets.all(12),
+                  margin: const EdgeInsets.only(top: AppTheme.paddingS),
+                  padding: const EdgeInsets.all(AppTheme.paddingS),
                   decoration: BoxDecoration(
-                    color: Colors.orange.shade50,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange, width: 2),
+                    gradient: LinearGradient(
+                      colors: [AppTheme.yellow50, AppTheme.yellow100],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(AppTheme.radiusXS),
+                    border: Border.all(color: AppTheme.yellow600, width: 2),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      const Text(
+                      Text(
                         'TOTAL',
-                        style: TextStyle(
+                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          color: AppTheme.gray900,
                         ),
                       ),
                       Text(
                         'Rp ${_formatCurrency(totalPajak)}',
-                        style: const TextStyle(
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                          color: Colors.orange,
+                          color: AppTheme.yellow900,
                         ),
                       ),
                     ],
@@ -300,14 +325,15 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
               setState(() {
                 _isDetectionActive = true;
                 _isProcessing = false;
-                _lastProcessedPlate = null;
               });
               debugPrint('▶️ Detection RESUMED by user');
             },
-            icon: const Icon(Icons.refresh, color: Colors.blue),
-            label: const Text('🔄 Detect Ulang'),
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.blue,
+            icon: Icon(Icons.refresh, color: AppTheme.blue600),
+            label: Text(
+              '🔄 Detect Ulang',
+              style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                color: AppTheme.blue600,
+              ),
             ),
           ),
           
@@ -318,24 +344,28 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
                 Navigator.pop(context);
                 // TODO: Implement save data logic
                 ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('✅ Data berhasil disimpan!'),
-                    backgroundColor: Colors.green,
+                  SnackBar(
+                    content: Text(
+                      '✅ Data berhasil disimpan!',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.neutralWhite,
+                      ),
+                    ),
+                    backgroundColor: AppTheme.successColor,
+                    behavior: SnackBarBehavior.floating,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(AppTheme.radiusXS),
+                    ),
                   ),
                 );
                 // Reset detection
                 setState(() {
                   _isDetectionActive = true;
                   _isProcessing = false;
-                  _lastProcessedPlate = null;
                 });
               },
               icon: const Icon(Icons.save),
               label: const Text('💾 Simpan Data'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
-                foregroundColor: Colors.white,
-              ),
             ),
         ],
       ),
@@ -352,18 +382,17 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
             width: 120,
             child: Text(
               label,
-              style: TextStyle(
-                color: Colors.grey.shade700,
-                fontSize: 12,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: AppTheme.gray600,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 12,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.gray900,
               ),
               maxLines: maxLines,
               overflow: TextOverflow.ellipsis,
@@ -385,21 +414,31 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('🧪 Simple OCR Test'),
-        backgroundColor: Colors.purple,
+        title: Text(
+          '🧪 Simple OCR Test',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+            color: AppTheme.neutralWhite,
+          ),
+        ),
       ),
       body: Column(
         children: [
           // Stats
           Container(
-            padding: const EdgeInsets.all(16),
-            color: Colors.purple.shade50,
+            padding: const EdgeInsets.all(AppTheme.paddingM),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [AppTheme.blue50, AppTheme.blue100],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
-                _buildStat('Cropped', _totalCropped, Colors.blue),
-                _buildStat('OCR ✅', _totalOCRSuccess, Colors.green),
-                _buildStat('OCR ❌', _totalOCRFailed, Colors.red),
+                _buildStat('Cropped', _totalCropped, AppTheme.blue600),
+                _buildStat('OCR ✅', _totalOCRSuccess, AppTheme.green600),
+                _buildStat('OCR ❌', _totalOCRFailed, AppTheme.red600),
               ],
             ),
           ),
@@ -408,19 +447,30 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
           if (_isCheckingAPI)
             Container(
               padding: const EdgeInsets.all(12),
-              color: Colors.orange.shade100,
-              child: const Row(
+              decoration: BoxDecoration(
+                color: AppTheme.yellow100,
+                border: Border(
+                  bottom: BorderSide(color: AppTheme.yellow400, width: 2),
+                ),
+              ),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppTheme.yellow800),
+                    ),
                   ),
-                  SizedBox(width: 12),
+                  const SizedBox(width: 12),
                   Text(
                     '🚀 Checking pajak info via API...',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.yellow900,
+                    ),
                   ),
                 ],
               ),
@@ -430,13 +480,20 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
           Expanded(
             flex: 2,
             child: Container(
-              margin: const EdgeInsets.all(8),
+              margin: const EdgeInsets.all(AppTheme.paddingS),
               decoration: BoxDecoration(
-                border: Border.all(color: Colors.purple, width: 2),
-                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppTheme.blue900, width: 2),
+                borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppTheme.blue900.withOpacity(0.1),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
               child: ClipRRect(
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(AppTheme.radiusS - 2),
                 child: YOLOView(
                   modelPath: 'plat_recognation.tflite',
                   task: YOLOTask.detect,
@@ -487,7 +544,6 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
                             setState(() {
                               _isProcessing = true;
                               _isDetectionActive = false;
-                              _lastProcessedPlate = formatted;
                               _totalOCRSuccess++;
                               _ocrResults.insert(0, '✅ $formatted');
                               if (_ocrResults.length > 20) _ocrResults.removeLast();
@@ -537,51 +593,72 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
           // Results
           Expanded(
             child: Container(
-              color: Colors.grey.shade900,
+              color: AppTheme.blueGray900,
               child: Column(
                 children: [
                   Container(
                     padding: const EdgeInsets.all(12),
-                    color: Colors.purple,
-                    child: const Row(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [AppTheme.blue900, AppTheme.blueGray900],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    child: Row(
                       children: [
-                        Icon(Icons.list, color: Colors.white),
-                        SizedBox(width: 8),
+                        const Icon(Icons.list, color: AppTheme.neutralWhite),
+                        const SizedBox(width: 8),
                         Text(
                           'OCR Results (Latest First)',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                          style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            color: AppTheme.neutralWhite,
+                          ),
                         ),
                       ],
                     ),
                   ),
                   Expanded(
                     child: _ocrResults.isEmpty
-                        ? const Center(
+                        ? Center(
                             child: Text(
                               'Waiting for cropped plates...',
-                              style: TextStyle(color: Colors.white54),
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: AppTheme.gray400,
+                              ),
                             ),
                           )
                         : ListView.builder(
-                            padding: const EdgeInsets.all(8),
+                            padding: const EdgeInsets.all(AppTheme.paddingS),
                             itemCount: _ocrResults.length,
                             itemBuilder: (context, index) {
                               final result = _ocrResults[index];
                               final isSuccess = result.startsWith('✅');
                               return Card(
-                                color: isSuccess ? Colors.green.shade900 : Colors.red.shade900,
+                                margin: const EdgeInsets.only(bottom: AppTheme.paddingS),
+                                elevation: AppTheme.elevationS,
+                                color: isSuccess ? AppTheme.green900 : AppTheme.red900,
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(AppTheme.radiusXS),
+                                  side: BorderSide(
+                                    color: isSuccess ? AppTheme.green600 : AppTheme.red600,
+                                    width: 1,
+                                  ),
+                                ),
                                 child: ListTile(
                                   dense: true,
                                   title: Text(
                                     result,
-                                    style: const TextStyle(
-                                      color: Colors.white,
+                                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                      color: AppTheme.neutralWhite,
                                       fontFamily: 'monospace',
                                     ),
                                   ),
                                   trailing: Text(
                                     '#${_ocrResults.length - index}',
-                                    style: const TextStyle(color: Colors.white54, fontSize: 12),
+                                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                                      color: AppTheme.gray400,
+                                    ),
                                   ),
                                 ),
                               );
@@ -602,13 +679,18 @@ class _SimpleOCRTestScreenState extends State<SimpleOCRTestScreen> {
       children: [
         Text(
           value.toString(),
-          style: TextStyle(
-            fontSize: 32,
+          style: Theme.of(context).textTheme.displayLarge?.copyWith(
             fontWeight: FontWeight.bold,
             color: color,
           ),
         ),
-        Text(label, style: const TextStyle(fontSize: 12)),
+        const SizedBox(height: 4),
+        Text(
+          label,
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            color: AppTheme.gray700,
+          ),
+        ),
       ],
     );
   }
