@@ -49,7 +49,7 @@ class YOLOView extends StatefulWidget {
     this.onZoomChanged,
     this.streamingConfig,
     this.confidenceThreshold = 0.5,
-    this.iouThreshold = 0.45,
+    this.iouThreshold = 0.20, // 🔥 FIX: Changed from 0.45 to 0.20 for aggressive NMS (fixes double overlay)
     this.useGpu = true,
     this.showOverlays = true,
     this.overlayTheme = const YOLOOverlayTheme(),

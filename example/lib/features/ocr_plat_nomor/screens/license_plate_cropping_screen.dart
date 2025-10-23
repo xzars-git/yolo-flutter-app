@@ -693,7 +693,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                   modelPath: 'plat_recognation.tflite',
                   task: YOLOTask.detect,
                   confidenceThreshold: _currentConfidence,
-                  iouThreshold: 0.30,  // 🔧 LOWER IoU untuk filter double overlay lebih agresif (default: 0.45)
+                  // iouThreshold: Removed - using native default 0.20 for aggressive NMS (fixes double overlay)
                   
                   // 🎯 STATIC streaming config (FIXED!)
                   streamingConfig: YOLOStreamingConfig(
