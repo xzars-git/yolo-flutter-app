@@ -49,6 +49,10 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
   // 🎯 Detection control - HANYA 2 FLAGS (fixed, no more _hasProcessedThisCycle!)
   bool _isDetectionActive = true;  // Control detection ON/OFF
   bool _isProcessing = false;       // Flag: sedang proses OCR
+  
+  // 🔥 FIX: Debounce callback to prevent rapid setState() calls
+  DateTime _lastCallbackTime = DateTime.now();
+  static const _callbackDebounceMs = 300; // Min 300ms between callbacks
 
   @override
   void initState() {
@@ -693,9 +697,8 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                   modelPath: 'plat_recognation.tflite',
                   task: YOLOTask.detect,
                   confidenceThreshold: _currentConfidence,
-                  // iouThreshold: Removed - using native default 0.20 for aggressive NMS (fixes double overlay)
+                  // showOverlays: true by default - native overlay tetap muncul real-time
                   
-                  // 🎯 STATIC streaming config (FIXED!)
                   streamingConfig: YOLOStreamingConfig(
                     enableCropping: true,
                     croppingPadding: 0.1,
@@ -704,6 +707,38 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                     includeDetections: true,
                     includeOriginalImage: true,
                   ),
+                  
+                  // SOLUTION: Use onStreamingData instead of onResult
+                  // This callback gets detection data WITHOUT triggering overlay render
+                  onStreamingData: (Map<String, dynamic> data) {
+                    // Skip if processing to prevent status update spam
+                    if (_isProcessing) return;
+                    
+                    final now = DateTime.now();
+                    final timeSinceLastUpdate = now.difference(_lastCallbackTime).inMilliseconds;
+                    
+                    // Debounce status updates
+                    if (timeSinceLastUpdate < _callbackDebounceMs) return;
+                    _lastCallbackTime = now;
+                    
+                    // Parse detection count from streaming data
+                    final detections = data['detections'] as List?;
+                    final detectionCount = detections?.length ?? 0;
+                    
+                    setState(() {
+                      if (detectionCount > 0) {
+                        _totalDetected += detectionCount;
+                      }
+                      
+                      if (!_isDetectionActive) {
+                        _statusMessage = '⏸️ Detection paused - Processing OCR...';
+                      } else if (detectionCount == 0) {
+                        _statusMessage = '🔍 Arahkan kamera ke plat nomor...';
+                      } else {
+                        _statusMessage = '✅ $detectionCount plat terdeteksi';
+                      }
+                    });
+                  },
                   
                   onCroppedImages: (List<YOLOCroppedImage> images) async {
                     print('');
@@ -715,6 +750,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                     
                     if (images.isEmpty) {
                       print('❌ No images');
+                      print('================================================');
                       return;
                     }
 
@@ -724,6 +760,16 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                       print('================================================');
                       return;
                     }
+                    
+                    // 🔥 FIX: Debounce callback to prevent rapid setState() calls
+                    final now = DateTime.now();
+                    final timeSinceLastCallback = now.difference(_lastCallbackTime).inMilliseconds;
+                    if (timeSinceLastCallback < _callbackDebounceMs) {
+                      print('⏭️ Callback DEBOUNCED (only ${timeSinceLastCallback}ms since last)');
+                      print('================================================');
+                      return;
+                    }
+                    _lastCallbackTime = now;
 
                     final img = images.first;
                     print('🟢 Processing image: confidence=${(img.confidence*100).toStringAsFixed(1)}%');
@@ -740,17 +786,14 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                       return;
                     }
 
-                    // Pause detection
-                    setState(() {
-                      _isDetectionActive = false;
-                      _totalCropped++;
-                    });
-
                     print('⏸️ Detection PAUSED - Starting OCR...');
 
                     final plateData = PlateData(croppedImage: img);
                     
+                    // 🔥 FIX: Combine setState() calls to prevent double overlay render
                     setState(() {
+                      _isDetectionActive = false;
+                      _totalCropped++;
                       _croppedPlates.add(plateData);
                       if (_croppedPlates.length > 12) {
                         _croppedPlates.removeAt(0);
@@ -766,23 +809,9 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                     print('================================================');
                   },
                   
-                  onResult: (List<YOLOResult> results) {
-                    print('📊 onResult: ${results.length} detections');
-                    
-                    if (!_isProcessing) {
-                      setState(() {
-                        _totalDetected += results.length;
-                        
-                        if (!_isDetectionActive) {
-                          _statusMessage = '⏸️ Detection paused - Processing OCR...';
-                        } else if (results.isEmpty) {
-                          _statusMessage = '🔍 Arahkan kamera ke plat nomor...';
-                        } else {
-                          _statusMessage = '✅ ${results.length} plat terdeteksi';
-                        }
-                      });
-                    }
-                  },
+                  // ❌ onResult REMOVED - causes double overlay when combined with showOverlays: true
+                  // ✅ Detection tracking now handled by onStreamingData above (data-only, no overlay trigger)
+               
                 ),
               ),
             ),
