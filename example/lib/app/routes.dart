@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../presentation/screens/simple_ocr_test_screen.dart';
+import '../features/ocr_plat_nomor/screens/license_plate_cropping_screen.dart';
 
 /// Centralized route configuration
 class AppRoutes {
@@ -8,15 +8,15 @@ class AppRoutes {
 
   // Route names
   static const String home = '/';
-  static const String ocrTest = '/ocr-test';
+  static const String ocrPlatNomor = '/ocr-plat-nomor';
 
   /// Route generator
   static Route<dynamic> generateRoute(RouteSettings settings) {
     switch (settings.name) {
       case home:
-      case ocrTest:
+      case ocrPlatNomor:
         return MaterialPageRoute(
-          builder: (_) => const SimpleOCRTestScreen(),
+          builder: (_) => const LicensePlateCroppingScreen(),
           settings: settings,
         );
 
@@ -35,8 +35,8 @@ class AppRoutes {
   /// All routes map (untuk Navigator with named routes)
   static Map<String, WidgetBuilder> get routes {
     return {
-      home: (context) => const SimpleOCRTestScreen(),
-      ocrTest: (context) => const SimpleOCRTestScreen(),
+      home: (context) => const LicensePlateCroppingScreen(),
+      ocrPlatNomor: (context) => const LicensePlateCroppingScreen(),
     };
   }
 }
