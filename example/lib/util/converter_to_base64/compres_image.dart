@@ -1,6 +1,6 @@
 import 'dart:typed_data';
 import 'dart:io';
-import 'package:flutter_image_compress/flutter_image_compress.dart';
+// import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:convert';
 
 import 'package:ultralytics_yolo_example/service/api_service.dart';
@@ -26,161 +26,161 @@ class CompressionResult {
 CompressionResult? lastCompressionResult;
 
 // Compress image file and return XFile if file size is under compression target
-Future<XFile> compressImage({
-  //TESTING PURPOSE
-  // int targetFileSize = 15 * 1024,
-  //PROD PURPOSE
-  int targetFileSize = 300 * 1024,
-  required XFile pickedFile,
-  int compressionQuality = 90,
-  required String? noPolisi1,
-  required String? noPolisi2,
-  required String? noPolisi3,
-  required String? compressFrom,
-}) async {
-  File file = File(pickedFile.path);
-  XFile? compressedXFile;
-  bool isCompressed = false;
-  bool isValid = true;
-  String? errorMessage;
+// Future<XFile> compressImage({
+//   //TESTING PURPOSE
+//   // int targetFileSize = 15 * 1024,
+//   //PROD PURPOSE
+//   int targetFileSize = 300 * 1024,
+//   required XFile pickedFile,
+//   int compressionQuality = 90,
+//   required String? noPolisi1,
+//   required String? noPolisi2,
+//   required String? noPolisi3,
+//   required String? compressFrom,
+// }) async {
+//   File file = File(pickedFile.path);
+//   XFile? compressedXFile;
+//   bool isCompressed = false;
+//   bool isValid = true;
+//   String? errorMessage;
 
-  int originalFileSize = await file.length();
-  int finalFileSize = originalFileSize;
+//   int originalFileSize = await file.length();
+//   int finalFileSize = originalFileSize;
 
-  // Check if original file size is under target size
-  if (originalFileSize <= targetFileSize) {
-    // Store result info
-    lastCompressionResult = CompressionResult(
-      isValid: true,
-      isCompressed: false,
-      originalSize: originalFileSize,
-      finalSize: originalFileSize,
-      errorMessage: null,
-    );
-    return pickedFile;
-  }
+//   // Check if original file size is under target size
+//   if (originalFileSize <= targetFileSize) {
+//     // Store result info
+//     lastCompressionResult = CompressionResult(
+//       isValid: true,
+//       isCompressed: false,
+//       originalSize: originalFileSize,
+//       finalSize: originalFileSize,
+//       errorMessage: null,
+//     );
+//     return pickedFile;
+//   }
 
-  Uint8List? compressedBytes;
+//   Uint8List? compressedBytes;
 
-  try {
-    // Read image file
-    Uint8List originalFileBytes = Uint8List.fromList(await file.readAsBytes());
+//   try {
+//     // Read image file
+//     Uint8List originalFileBytes = Uint8List.fromList(await file.readAsBytes());
 
-    // Make a backup of original file data
-    File backupFile = File('${file.path}.backup');
-    await backupFile.writeAsBytes(originalFileBytes);
+//     // Make a backup of original file data
+//     File backupFile = File('${file.path}.backup');
+//     await backupFile.writeAsBytes(originalFileBytes);
 
-    while (originalFileSize > targetFileSize && compressionQuality > 0) {
-      // Compress image data
-      compressedBytes = await FlutterImageCompress.compressWithList(
-        originalFileBytes,
-        quality: compressionQuality,
-      );
-      compressionQuality -= 10;
+//     while (originalFileSize > targetFileSize && compressionQuality > 0) {
+//       // Compress image data
+//       compressedBytes = await FlutterImageCompress.compressWithList(
+//         originalFileBytes,
+//         quality: compressionQuality,
+//       );
+//       compressionQuality -= 10;
 
-      // Check if compressed size is within target size
-      if (compressedBytes.length <= targetFileSize) {
-        break;
-      }
-    }
+//       // Check if compressed size is within target size
+//       if (compressedBytes.length <= targetFileSize) {
+//         break;
+//       }
+//     }
 
-    if (compressedBytes != null && compressedBytes.isNotEmpty) {
-      // Validate image data before saving
-      isValid = await _validateImageData(compressedBytes);
+//     if (compressedBytes != null && compressedBytes.isNotEmpty) {
+//       // Validate image data before saving
+//       isValid = await _validateImageData(compressedBytes);
 
-      if (isValid) {
-        // Write compressed data to the original file
-        await file.writeAsBytes(compressedBytes);
-        compressedXFile = XFile(file.path);
-        isCompressed = true;
-        finalFileSize = compressedBytes.length;
+//       if (isValid) {
+//         // Write compressed data to the original file
+//         await file.writeAsBytes(compressedBytes);
+//         compressedXFile = XFile(file.path);
+//         isCompressed = true;
+//         finalFileSize = compressedBytes.length;
 
-        // Remove backup since compression was successful
-        if (await backupFile.exists()) {
-          await backupFile.delete();
-        }
-      } else {
-        // Restore from backup
-        if (await backupFile.exists()) {
-          Uint8List backupBytes = await backupFile.readAsBytes();
-          await file.writeAsBytes(backupBytes);
-          await backupFile.delete();
-        }
-        errorMessage = "Compressed image validation failed";
-        compressedXFile = pickedFile;
-      }
-    } else {
-      // Delete backup if it exists
-      if (await backupFile.exists()) {
-        await backupFile.delete();
-      }
-      compressedXFile = pickedFile;
-      errorMessage = "Compression produced empty data";
-    }
+//         // Remove backup since compression was successful
+//         if (await backupFile.exists()) {
+//           await backupFile.delete();
+//         }
+//       } else {
+//         // Restore from backup
+//         if (await backupFile.exists()) {
+//           Uint8List backupBytes = await backupFile.readAsBytes();
+//           await file.writeAsBytes(backupBytes);
+//           await backupFile.delete();
+//         }
+//         errorMessage = "Compressed image validation failed";
+//         compressedXFile = pickedFile;
+//       }
+//     } else {
+//       // Delete backup if it exists
+//       if (await backupFile.exists()) {
+//         await backupFile.delete();
+//       }
+//       compressedXFile = pickedFile;
+//       errorMessage = "Compression produced empty data";
+//     }
 
-    // Log compression result
-    await ApiService.sendLog(
-      logString:
-          "Image compression: original=$originalFileSize, compressed=$finalFileSize, isCompressed=$isCompressed, isValid=$isValid",
-      isAvailableNoPol: true,
-      noPolisi1: noPolisi1,
-      noPolisi2: noPolisi2,
-      noPolisi3: noPolisi3,
-      processName: "Compress Image - $compressFrom",
-    ).timeout(const Duration(seconds: 30));
+//     // Log compression result
+//     await ApiService.sendLog(
+//       logString:
+//           "Image compression: original=$originalFileSize, compressed=$finalFileSize, isCompressed=$isCompressed, isValid=$isValid",
+//       isAvailableNoPol: true,
+//       noPolisi1: noPolisi1,
+//       noPolisi2: noPolisi2,
+//       noPolisi3: noPolisi3,
+//       processName: "Compress Image - $compressFrom",
+//     ).timeout(const Duration(seconds: 30));
 
-    // Store result info
-    lastCompressionResult = CompressionResult(
-      isValid: isValid,
-      isCompressed: isCompressed,
-      originalSize: originalFileSize,
-      finalSize: finalFileSize,
-      errorMessage: errorMessage,
-    );
+//     // Store result info
+//     lastCompressionResult = CompressionResult(
+//       isValid: isValid,
+//       isCompressed: isCompressed,
+//       originalSize: originalFileSize,
+//       finalSize: finalFileSize,
+//       errorMessage: errorMessage,
+//     );
 
-    return compressedXFile;
-  } catch (e) {
-    await ApiService.sendLog(
-      logString: e.toString(),
-      isAvailableNoPol: true,
-      noPolisi1: noPolisi1,
-      noPolisi2: noPolisi2,
-      noPolisi3: noPolisi3,
-      processName: "Compress Image - $compressFrom",
-    ).timeout(const Duration(seconds: 30));
+//     return compressedXFile;
+//   } catch (e) {
+//     await ApiService.sendLog(
+//       logString: e.toString(),
+//       isAvailableNoPol: true,
+//       noPolisi1: noPolisi1,
+//       noPolisi2: noPolisi2,
+//       noPolisi3: noPolisi3,
+//       processName: "Compress Image - $compressFrom",
+//     ).timeout(const Duration(seconds: 30));
 
-    // Try to restore from backup if it exists
-    File backupFile = File('${file.path}.backup');
-    if (await backupFile.exists()) {
-      try {
-        Uint8List backupBytes = await backupFile.readAsBytes();
-        await file.writeAsBytes(backupBytes);
-        await backupFile.delete();
-      } catch (restoreError) {
-        // Failed to restore, log it
-        await ApiService.sendLog(
-          logString: "Failed to restore from backup: $restoreError",
-          isAvailableNoPol: true,
-          noPolisi1: noPolisi1,
-          noPolisi2: noPolisi2,
-          noPolisi3: noPolisi3,
-          processName: "Compress Image Restore - $compressFrom",
-        ).timeout(const Duration(seconds: 30));
-      }
-    }
+//     // Try to restore from backup if it exists
+//     File backupFile = File('${file.path}.backup');
+//     if (await backupFile.exists()) {
+//       try {
+//         Uint8List backupBytes = await backupFile.readAsBytes();
+//         await file.writeAsBytes(backupBytes);
+//         await backupFile.delete();
+//       } catch (restoreError) {
+//         // Failed to restore, log it
+//         await ApiService.sendLog(
+//           logString: "Failed to restore from backup: $restoreError",
+//           isAvailableNoPol: true,
+//           noPolisi1: noPolisi1,
+//           noPolisi2: noPolisi2,
+//           noPolisi3: noPolisi3,
+//           processName: "Compress Image Restore - $compressFrom",
+//         ).timeout(const Duration(seconds: 30));
+//       }
+//     }
 
-    // Store result info
-    lastCompressionResult = CompressionResult(
-      isValid: false,
-      isCompressed: false,
-      originalSize: originalFileSize,
-      finalSize: originalFileSize,
-      errorMessage: e.toString(),
-    );
+//     // Store result info
+//     lastCompressionResult = CompressionResult(
+//       isValid: false,
+//       isCompressed: false,
+//       originalSize: originalFileSize,
+//       finalSize: originalFileSize,
+//       errorMessage: e.toString(),
+//     );
 
-    return pickedFile;
-  }
-}
+//     return pickedFile;
+//   }
+// }
 
 // Check if the last compression was successful
 bool wasLastCompressionSuccessful() {

@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer.dart';
+import 'package:flutter_bluetooth_printer_platform_interface/flutter_bluetooth_printer_platform_interface.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_svg/svg.dart';
+import 'package:printing/printing.dart';
 import 'package:ultralytics_yolo_example/features/detail_telusur_mandiri_ocr/controller/detail_telusur_mandiri_ocr_controller.dart';
 import 'package:ultralytics_yolo_example/features/detail_telusur_mandiri_ocr/utils/detail_telusur_mandiri_ocr_utils.dart';
+import 'package:ultralytics_yolo_example/features/detail_telusur_mandiri_ocr/utils/pajak_pdf_generator.dart';
 import 'package:ultralytics_yolo_example/model/data_besaran_pajak.dart';
+import 'package:ultralytics_yolo_example/state_util.dart';
 import 'package:ultralytics_yolo_example/theme/theme_config.dart';
 import 'package:ultralytics_yolo_example/util/string_util/string_util.dart';
 import 'package:ultralytics_yolo_example/widget/button/primary_button.dart';
@@ -19,7 +24,24 @@ class DetailTelusurMandiriOcrView extends StatefulWidget {
     final isValidWa = _isValidWa(dataKendaraan?.noWa);
     final isValidEmail = _isValidEmail(dataKendaraan?.email);
     return Scaffold(
-      appBar: AppBar(title: const Text("Detail Data")),
+      appBar: AppBar(
+        title: const Text("Detail Data"),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print),
+            onPressed: () async {
+              final selected = await FlutterBluetoothPrinter.selectDevice(context);
+              FlutterBluetoothPrinter.getState().then((state) {
+                debugPrint('Printer State: $state');
+              });
+
+              controller.selectedDevice = selected;
+              controller.address = selected?.address;
+              controller.update();
+            },
+          ),
+        ],
+      ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: Container(
         padding: const EdgeInsets.all(16.0),
@@ -45,7 +67,35 @@ class DetailTelusurMandiriOcrView extends StatefulWidget {
             SizedBox(
               width: double.infinity,
               child: TextButton(
-                onPressed: () {},
+                onPressed: () async {
+                  try {
+                    final pdfBytes = await PajakPdfGenerator.generate(
+                      dataKendaraan ?? DataKendaraan(),
+                      dataKendaraan?.dataHitungPajak,
+                    );
+                    final pages = Printing.raster(pdfBytes, dpi: 300);
+                    final pageList = await pages.toList();
+                    debugPrint('Rasterized into ${pageList.length} image(s)');
+                    for (var i = 0; i < pageList.length; i++) {
+                      final page = pageList[i];
+                      final imageBytes = await page.toPng();
+
+                      await FlutterBluetoothPrinter.printImageSingle(
+                        address: controller.address ?? "",
+                        imageBytes: imageBytes,
+                        keepConnected: true,
+                        imageHeight: page.height,
+                        imageWidth: page.width,
+                        paperSize: PaperSize.mm58,
+                        addFeeds: 2,
+                      );
+
+                      debugPrint('Printed page ${i + 1}');
+                    }
+                  } catch (e) {
+                    debugPrint('Failed to print PDF: $e');
+                  }
+                },
                 child: Text(
                   "Cetak Info Pajak",
                   style: myTextTheme.titleMedium?.copyWith(color: blue900),
@@ -60,10 +110,12 @@ class DetailTelusurMandiriOcrView extends StatefulWidget {
         child: Column(
           children: [
             _containerInfoPrinter(
-              true,
+              (controller.selectedDevice?.name != null),
               icon: "assets/icons/info/info.svg",
-              title: "Terhubung ke printer",
-              printerName: "Comson 77",
+              title: (controller.selectedDevice?.name != null)
+                  ? "Terhubung ke printer"
+                  : "Tidak ada printer yang terhubung",
+              printerName: trimString(controller.selectedDevice?.name),
             ),
             const SizedBox(height: 16.0),
             Container(
@@ -177,6 +229,41 @@ class DetailTelusurMandiriOcrView extends StatefulWidget {
                 ),
               ],
             ),
+
+            // StreamBuilder(
+            //   stream: FlutterBluetoothPrinter.discovery,
+            //   builder: (context, snapshot) {
+            //     //TODO: handle snapshot states (loading, error, data)
+            //     DiscoveryResult list = snapshot.data as DiscoveryResult;
+            //     print("snapshot");
+            //     List<BluetoothDevice> listDevices = list.devices;
+            //     for (var i = 0; i < listDevices.length; i++) {
+            //       print(
+            //         'Discovered devices: ${listDevices[i].name} - ${listDevices[i].address} - ${listDevices[i].type}',
+            //       );
+            //     }
+
+            //     return ListView(
+            //       shrinkWrap: true,
+            //       physics: const NeverScrollableScrollPhysics(),
+            //       children: listDevices
+            //           .map(
+            //             (device) => InkWell(
+            //               onTap: () async {
+            //                 bool isConnect = await FlutterBluetoothPrinter.connect(device.address);
+            //                 print('Connected: $isConnect to ${device.name}');
+            //               },
+            //               child: ListTile(
+            //                 title: Text(device.name ?? "Unknown"),
+            //                 subtitle: Text(device.address ?? "No Address"),
+            //                 trailing: Text(device.type.toString().split('.').last),
+            //               ),
+            //             ),
+            //           )
+            //           .toList(),
+            //     );
+            //   },
+            // ),
             const SizedBox(height: 130.0),
           ],
         ),
