@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../models/ocr_result.dart';
-import '../models/pajak_info.dart';
 import '../services/ocr_service.dart' hide OCRResult; // Hide internal OCRResult class
 import '../services/pajak_service.dart';
 
@@ -8,6 +7,7 @@ import '../services/pajak_service.dart';
 /// Menangani business logic dan state management
 class OCRController extends ChangeNotifier {
   // Services
+  // ignore: unused_field
   final OCRService _ocrService = OCRService();
   final PajakService _pajakService = PajakService();
 
@@ -47,7 +47,7 @@ class OCRController extends ChangeNotifier {
   }
 
   /// Process cropped images dengan OCR
-  /// 
+  ///
   /// ⚠️ NOTE: Method ini belum diimplementasi karena masih menggunakan
   /// SimpleOCRTestScreen yang lama. Untuk full MVC implementation,
   /// perlu refactor processImageFile dari cropped image paths.
@@ -63,7 +63,7 @@ class OCRController extends ChangeNotifier {
     // TODO: Implement image processing
     // OCRService menggunakan Uint8List, bukan file path
     // Perlu convert file path -> Uint8List dulu
-    
+
     debugPrint('⚠️ processCroppedImages not yet fully implemented');
     return null;
 
@@ -105,9 +105,7 @@ class OCRController extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final pajakInfo = await _pajakService.getInfoPajak(
-        platNomor: platNomor,
-      );
+      final pajakInfo = await _pajakService.getInfoPajak(platNomor: platNomor);
 
       _isCheckingAPI = false;
       notifyListeners();

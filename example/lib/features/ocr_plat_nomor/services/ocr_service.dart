@@ -7,7 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 
 /// Service untuk melakukan OCR (Optical Character Recognition) pada gambar plat nomor
-/// 
+///
 /// Menggunakan Google ML Kit Text Recognition untuk extract text dari cropped images
 class OCRService {
   late final TextRecognizer _textRecognizer;
@@ -32,7 +32,7 @@ class OCRService {
   bool get isReady => _isInitialized;
 
   /// Extract text dari image bytes (JPEG/PNG)
-  /// 
+  ///
   /// Returns cleaned license plate text atau null jika gagal
   Future<String?> extractLicensePlateText(Uint8List imageBytes) async {
     if (!_isInitialized) {
@@ -42,20 +42,22 @@ class OCRService {
 
     try {
       debugPrint('🔍 OCR: Processing image (${imageBytes.length} bytes)...');
-      
+
       // 🎯 CRITICAL FIX: Untuk JPEG bytes, perlu save ke file temporary dulu
       // Karena InputImage.fromBytes() hanya untuk raw format (NV21/YUV)
       // Tapi JPEG dari cropping perlu di-decode dulu
-      
+
       // Gunakan file path approach untuk JPEG
       final tempDir = await getTemporaryDirectory();
-      final tempFile = File('${tempDir.path}/temp_ocr_${DateTime.now().millisecondsSinceEpoch}.jpg');
-      
+      final tempFile = File(
+        '${tempDir.path}/temp_ocr_${DateTime.now().millisecondsSinceEpoch}.jpg',
+      );
+
       try {
         // Write JPEG bytes to temp file
         await tempFile.writeAsBytes(imageBytes);
         debugPrint('📝 OCR: Saved temp file: ${tempFile.path}');
-        
+
         // Create InputImage from file path (ini cara yang benar untuk JPEG)
         final inputImage = InputImage.fromFilePath(tempFile.path);
 
@@ -77,21 +79,21 @@ class OCRService {
         String extractedText = recognizedText.text;
         debugPrint('📄 OCR Raw text: "$extractedText"');
         debugPrint('   Blocks: ${recognizedText.blocks.length}');
-        debugPrint('   Lines: ${recognizedText.blocks.map((b) => b.lines.length).reduce((a, b) => a + b)}');
-        
+        debugPrint(
+          '   Lines: ${recognizedText.blocks.map((b) => b.lines.length).reduce((a, b) => a + b)}',
+        );
+
         // Clean up the text (remove extra spaces, newlines, etc)
         extractedText = _cleanLicensePlateText(extractedText);
 
         debugPrint('✅ OCR Success: "$extractedText"');
         return extractedText;
-        
       } finally {
         // Pastikan temp file dihapus even jika error
         if (await tempFile.exists()) {
           await tempFile.delete();
         }
       }
-
     } catch (e, stackTrace) {
       debugPrint('❌ OCR Error: $e');
       debugPrint('   Stack trace: $stackTrace');
@@ -100,7 +102,7 @@ class OCRService {
   }
 
   /// Extract text dengan confidence score untuk setiap block
-  /// 
+  ///
   /// Returns list of detected text blocks dengan confidence level
   Future<List<OCRResult>> extractDetailedText(Uint8List imageBytes) async {
     if (!_isInitialized) {
@@ -112,7 +114,7 @@ class OCRService {
       final inputImage = InputImage.fromBytes(
         bytes: imageBytes,
         metadata: InputImageMetadata(
-          size: Size(100, 100),
+          size: const Size(100, 100),
           rotation: InputImageRotation.rotation0deg,
           format: InputImageFormat.yuv420,
           bytesPerRow: 100,
@@ -127,17 +129,18 @@ class OCRService {
         for (TextLine line in block.lines) {
           String cleanedText = _cleanLicensePlateText(line.text);
           if (cleanedText.isNotEmpty) {
-            results.add(OCRResult(
-              text: cleanedText,
-              confidence: _estimateConfidence(line),
-              boundingBox: line.boundingBox,
-            ));
+            results.add(
+              OCRResult(
+                text: cleanedText,
+                confidence: _estimateConfidence(line),
+                boundingBox: line.boundingBox,
+              ),
+            );
           }
         }
       }
 
       return results;
-
     } catch (e) {
       debugPrint('❌ OCR Detailed Error: $e');
       return [];
@@ -145,32 +148,35 @@ class OCRService {
   }
 
   /// Clean up text khusus untuk license plate format
-  /// 
+  ///
   /// Removes invalid characters, extra spaces, dan normalize format
   /// ✅ TAMBAHAN: Filter tahun yang ada di bawah plat nomor
   String _cleanLicensePlateText(String rawText) {
     // Remove extra whitespace and newlines
     String cleaned = rawText.replaceAll('\n', ' ').trim();
-    
+
     // Remove multiple spaces
     cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ');
-    
+
     // Convert to uppercase (standard untuk plat nomor)
     cleaned = cleaned.toUpperCase();
-    
+
     // Remove common OCR errors (special characters yang tidak valid di plat nomor)
     cleaned = cleaned.replaceAll(RegExp(r'[^\w\s]'), '');
-    
+
     // ✅ FILTER TAHUN: Hapus angka 4 digit atau format tahun (09-27, 0927, dll)
     // Tahun biasanya muncul di bawah plat nomor dan terbaca oleh OCR
     // Pattern: 09-27, 09.27, 0927, 2024, dll
-    cleaned = cleaned.replaceAll(RegExp(r'\s*\d{2}[-.\s]?\d{2}\s*$'), ''); // Format: 09-27 atau 0927
-    cleaned = cleaned.replaceAll(RegExp(r'\s*\d{4}\s*$'), '');             // Format: 2024
-    cleaned = cleaned.replaceAll(RegExp(r'\s*\d{2}/\d{2}\s*$'), '');       // Format: 09/27
-    
+    cleaned = cleaned.replaceAll(
+      RegExp(r'\s*\d{2}[-.\s]?\d{2}\s*$'),
+      '',
+    ); // Format: 09-27 atau 0927
+    cleaned = cleaned.replaceAll(RegExp(r'\s*\d{4}\s*$'), ''); // Format: 2024
+    cleaned = cleaned.replaceAll(RegExp(r'\s*\d{2}/\d{2}\s*$'), ''); // Format: 09/27
+
     // Remove extra spaces yang mungkin tersisa
     cleaned = cleaned.replaceAll(RegExp(r'\s+'), ' ');
-    
+
     return cleaned.trim();
   }
 
@@ -185,7 +191,7 @@ class OCRService {
   }
 
   /// Format text menjadi standard license plate format
-  /// 
+  ///
   /// Contoh: "B1234ABC" → "B 1234 ABC"
   /// ✅ REGEX KETAT: Harus sesuai format Indonesia (Huruf-Angka-Huruf)
   String formatLicensePlate(String text) {
@@ -203,11 +209,11 @@ class OCRService {
     final match = pattern.firstMatch(cleaned);
 
     if (match != null) {
-      String wilayah = match.group(1)!;  // B, DK, AB
-      String nomor = match.group(2)!;    // 2156, 1234
-      String seri = match.group(3)!;     // T8R, ABC, A
-      
-      return '$wilayah $nomor $seri';  // B 2156 T8R
+      String wilayah = match.group(1)!; // B, DK, AB
+      String nomor = match.group(2)!; // 2156, 1234
+      String seri = match.group(3)!; // T8R, ABC, A
+
+      return '$wilayah $nomor $seri'; // B 2156 T8R
     }
 
     // Jika tidak match format Indonesia, return original
@@ -220,7 +226,7 @@ class OCRService {
   bool isValidIndonesianPlate(String text) {
     // Remove spaces untuk validasi
     String noSpaces = text.replaceAll(' ', '');
-    
+
     // ✅ REGEX INDONESIA KETAT:
     // Format WAJIB: [HURUF 1-2][ANGKA 1-4][HURUF 1-3]
     // Contoh VALID:
@@ -232,13 +238,13 @@ class OCRService {
     //   - B 2156 (tidak ada seri huruf) ❌
     //   - 2156 T8R (tidak ada kode wilayah huruf) ❌
     final RegExp pattern = RegExp(r'^[A-Z]{1,2}\d{1,4}[A-Z]{1,3}$');
-    
+
     bool isValid = pattern.hasMatch(noSpaces);
-    
+
     if (!isValid) {
       debugPrint('⚠️ Invalid plate format: "$text" (must be: HURUF-ANGKA-HURUF)');
     }
-    
+
     return isValid;
   }
 
@@ -257,11 +263,7 @@ class OCRResult {
   final double confidence;
   final Rect boundingBox;
 
-  OCRResult({
-    required this.text,
-    required this.confidence,
-    required this.boundingBox,
-  });
+  OCRResult({required this.text, required this.confidence, required this.boundingBox});
 
   @override
   String toString() {

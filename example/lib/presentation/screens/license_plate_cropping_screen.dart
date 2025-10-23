@@ -2,10 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:ultralytics_yolo/ultralytics_yolo.dart';
-import '../../services/ocr_service.dart';
+import '../../features/ocr_plat_nomor/services/ocr_service.dart';
 
 /// Enhanced license plate recognition demo with cropping + OCR feature
-/// 
+///
 /// Flow: Detection → Cropping → OCR → Display Result
 /// Automatically extracts license plate numbers from detected plates
 class LicensePlateCroppingScreen extends StatefulWidget {
@@ -31,7 +31,7 @@ class PlateData {
 }
 
 class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen> {
-  List<PlateData> _croppedPlates = [];
+  final List<PlateData> _croppedPlates = [];
   int _totalDetected = 0;
   int _totalCropped = 0;
   int _totalOCRSuccess = 0;
@@ -39,11 +39,12 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
   double _currentConfidence = 0.3;
   late final OCRService _ocrService;
   bool _isOCREnabled = true;
-  
+
   // 🎯 NEW: Detection control untuk hemat CPU/memory
-  bool _isDetectionActive = true;  // Control detection ON/OFF
-  bool _isProcessing = false;       // Flag: sedang proses OCR
+  bool _isDetectionActive = true; // Control detection ON/OFF
+  bool _isProcessing = false; // Flag: sedang proses OCR
   bool _hasProcessedThisCycle = false; // 🎯 NEW: Prevent multiple crops di cycle yang sama
+  // ignore: unused_field
   PlateData? _currentPlateProcessing; // Plate yang sedang diproses
 
   @override
@@ -77,30 +78,28 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
 
     try {
       // Extract text using OCR
-      final ocrText = await _ocrService.extractLicensePlateText(
-        plateData.croppedImage.imageBytes!,
-      );
+      final ocrText = await _ocrService.extractLicensePlateText(plateData.croppedImage.imageBytes!);
 
       if (mounted) {
         setState(() {
           plateData.isProcessingOCR = false;
-          
+
           if (ocrText != null && ocrText.isNotEmpty) {
             // Format text jadi format plat nomor standar
             plateData.ocrText = _ocrService.formatLicensePlate(ocrText);
             plateData.ocrError = null;
             _totalOCRSuccess++;
-            
+
             debugPrint('✅ OCR Result #${index + 1}: "${plateData.ocrText}"');
             _statusMessage = '✅ OCR Berhasil: ${plateData.ocrText}';
-            
+
             // 🎯 Show confirmation dialog
             _showOCRResultDialog(plateData);
           } else {
             plateData.ocrError = 'Tidak ada text terdeteksi';
             debugPrint('⚠️ OCR #${index + 1}: No text detected');
             _statusMessage = '⚠️ OCR tidak menemukan text';
-            
+
             // Resume detection jika gagal
             _resumeDetection();
           }
@@ -113,7 +112,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
           plateData.ocrError = 'OCR Error: $e';
           _statusMessage = '❌ OCR Error';
         });
-        
+
         // Resume detection jika error
         _resumeDetection();
       }
@@ -183,14 +182,11 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(6),
-                  child: Image.memory(
-                    plateData.croppedImage.imageBytes!,
-                    fit: BoxFit.contain,
-                  ),
+                  child: Image.memory(plateData.croppedImage.imageBytes!, fit: BoxFit.contain),
                 ),
               ),
             const SizedBox(height: 16),
-            
+
             // OCR Result
             Container(
               padding: const EdgeInsets.all(16),
@@ -203,10 +199,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                 children: [
                   const Text(
                     'Hasil OCR Plat Nomor:',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
                   ),
                   const SizedBox(height: 8),
                   Text(
@@ -222,16 +215,13 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                   const SizedBox(height: 8),
                   Text(
                     'Confidence: ${(plateData.croppedImage.confidence * 100).toStringAsFixed(1)}%',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.green.shade700,
-                    ),
+                    style: TextStyle(fontSize: 11, color: Colors.green.shade700),
                   ),
                 ],
               ),
             ),
             const SizedBox(height: 20),
-            
+
             // 🎯 Pertanyaan konfirmasi yang jelas
             Container(
               padding: const EdgeInsets.all(12),
@@ -256,10 +246,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                   const SizedBox(height: 4),
                   Text(
                     'Periksa apakah plat nomor di atas sudah sesuai dengan gambar',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey.shade600,
-                    ),
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
                     textAlign: TextAlign.center,
                   ),
                 ],
@@ -282,14 +269,14 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
               textAlign: TextAlign.center,
             ),
           ),
-          
+
           // Sudah Benar - Stop
           ElevatedButton.icon(
             onPressed: () {
               Navigator.pop(context);
               debugPrint('✅ User: OCR sudah benar - Stop detection');
               _stopDetection();
-              
+
               // Show success message
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
@@ -311,10 +298,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
               );
             },
             icon: const Icon(Icons.check_circle),
-            label: const Text(
-              'Sudah Benar\nSimpan Data',
-              textAlign: TextAlign.center,
-            ),
+            label: const Text('Sudah Benar\nSimpan Data', textAlign: TextAlign.center),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.green.shade600,
               foregroundColor: Colors.white,
@@ -334,12 +318,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
         title: const Text('🚗 License Plate Detection & Cropping'),
         backgroundColor: Colors.indigo,
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: _showInfoDialog,
-          ),
-        ],
+        actions: [IconButton(icon: const Icon(Icons.info_outline), onPressed: _showInfoDialog)],
       ),
       body: Column(
         children: [
@@ -423,26 +402,35 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                   modelPath: 'plat_recognation.tflite',
                   task: YOLOTask.detect,
                   confidenceThreshold: _currentConfidence,
-                  
+
                   // Enhanced streaming configuration for license plates
-                  // 🎯 Dynamic config based on detection state  
+                  // 🎯 Dynamic config based on detection state
                   streamingConfig: YOLOStreamingConfig(
-                    enableCropping: true,  // 🎯 FORCE ENABLE untuk test OCR
-                    croppingPadding: 0.1,         // Small padding untuk OCR
-                    croppingQuality: 90,          // High quality JPEG compression
-                    inferenceFrequency: _isDetectionActive && !_isProcessing ? 15 : 1,  // 🎯 1 FPS saat pause (hemat CPU)
-                    includeDetections: _isDetectionActive && !_isProcessing,  // 🎯 Disable saat processing
-                    includeOriginalImage: _isDetectionActive && !_isProcessing,  // 🎯 Disable saat processing
+                    enableCropping: true, // 🎯 FORCE ENABLE untuk test OCR
+                    croppingPadding: 0.1, // Small padding untuk OCR
+                    croppingQuality: 90, // High quality JPEG compression
+                    inferenceFrequency: _isDetectionActive && !_isProcessing
+                        ? 15
+                        : 1, // 🎯 1 FPS saat pause (hemat CPU)
+                    includeDetections:
+                        _isDetectionActive && !_isProcessing, // 🎯 Disable saat processing
+                    includeOriginalImage:
+                        _isDetectionActive && !_isProcessing, // 🎯 Disable saat processing
                     includeFps: false,
                     includeProcessingTimeMs: false,
                   ),
-                  
+
                   // Handle cropped license plates → Auto OCR
                   // 🎯 NEW: Process hanya 1 plate, pause detection
                   onCroppedImages: (List<YOLOCroppedImage> images) async {
                     // 🎯 CRITICAL: Skip jika sedang processing atau detection inactive atau sudah proses
-                    if (_isProcessing || !_isDetectionActive || images.isEmpty || _hasProcessedThisCycle) {
-                      debugPrint('⚠️ Skipping crop: processing=$_isProcessing, active=$_isDetectionActive, hasProcessed=$_hasProcessedThisCycle');
+                    if (_isProcessing ||
+                        !_isDetectionActive ||
+                        images.isEmpty ||
+                        _hasProcessedThisCycle) {
+                      debugPrint(
+                        '⚠️ Skipping crop: processing=$_isProcessing, active=$_isDetectionActive, hasProcessed=$_hasProcessedThisCycle',
+                      );
                       return;
                     }
 
@@ -451,10 +439,10 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
 
                     // 🎯 Ambil hanya plate PERTAMA (ignore sisanya untuk hemat CPU)
                     final img = images.first;
-                    
+
                     // 🎯 PAUSE detection immediately
                     setState(() {
-                      _isDetectionActive = false;  // Stop detection
+                      _isDetectionActive = false; // Stop detection
                       _totalCropped++;
                     });
 
@@ -462,10 +450,10 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
 
                     // Create PlateData object
                     final plateData = PlateData(croppedImage: img);
-                    
+
                     setState(() {
                       _croppedPlates.add(plateData);
-                      
+
                       // Keep only last 12 cropped plates
                       if (_croppedPlates.length > 12) {
                         _croppedPlates.removeAt(0);
@@ -478,27 +466,28 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                     debugPrint('   Confidence: ${(img.confidence * 100).toStringAsFixed(1)}%');
                     debugPrint('   Crop Size: ${img.width}x${img.height} pixels');
                     debugPrint('   Aspect Ratio: ${(img.width / img.height).toStringAsFixed(2)}');
-                    
+
                     // ✨ AUTO OCR PROCESSING ✨
                     final currentIndex = _croppedPlates.length - 1;
                     await _processOCR(plateData, currentIndex);
-                    
+
                     debugPrint('==========================================');
                   },
-                  
+
                   // Handle detection results
                   // 🎯 NEW: Update status hanya jika detection active
                   onResult: (List<YOLOResult> results) {
                     if (!_isProcessing) {
                       setState(() {
                         _totalDetected += results.length;
-                        
+
                         if (!_isDetectionActive) {
                           _statusMessage = '⏸️ Detection paused - Processing OCR...';
                         } else if (results.isEmpty) {
                           _statusMessage = '🔍 Arahkan kamera ke plat nomor kendaraan...';
                         } else {
-                          _statusMessage = '✅ ${results.length} plat terdeteksi - memproses cropping...';
+                          _statusMessage =
+                              '✅ ${results.length} plat terdeteksi - memproses cropping...';
                         }
                       });
                     }
@@ -555,15 +544,17 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                                 size: 28,
                               ),
                               tooltip: _isDetectionActive ? 'Pause Detection' : 'Start Detection',
-                              onPressed: _isProcessing ? null : () {
-                                if (_isDetectionActive) {
-                                  _stopDetection();
-                                } else {
-                                  _startDetection();
-                                }
-                              },
+                              onPressed: _isProcessing
+                                  ? null
+                                  : () {
+                                      if (_isDetectionActive) {
+                                        _stopDetection();
+                                      } else {
+                                        _startDetection();
+                                      }
+                                    },
                             ),
-                            
+
                             // OCR Toggle
                             IconButton(
                               icon: Icon(
@@ -574,13 +565,13 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                               onPressed: () {
                                 setState(() {
                                   _isOCREnabled = !_isOCREnabled;
-                                  _statusMessage = _isOCREnabled 
-                                    ? '✅ OCR Activated!' 
-                                    : '⏹️ OCR Deactivated';
+                                  _statusMessage = _isOCREnabled
+                                      ? '✅ OCR Activated!'
+                                      : '⏹️ OCR Deactivated';
                                 });
                               },
                             ),
-                            
+
                             TextButton.icon(
                               onPressed: () {
                                 setState(() {
@@ -593,9 +584,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                               },
                               icon: const Icon(Icons.clear_all, size: 18),
                               label: const Text('Clear'),
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.white70,
-                              ),
+                              style: TextButton.styleFrom(foregroundColor: Colors.white70),
                             ),
                           ],
                         ),
@@ -609,22 +598,24 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  _isDetectionActive ? Icons.directions_car_outlined : Icons.pause_circle_outlined,
+                                  _isDetectionActive
+                                      ? Icons.directions_car_outlined
+                                      : Icons.pause_circle_outlined,
                                   size: 64,
                                   color: Colors.grey.shade500,
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  _isDetectionActive 
-                                    ? 'Belum ada plat nomor yang di-crop'
-                                    : 'Detection paused',
+                                  _isDetectionActive
+                                      ? 'Belum ada plat nomor yang di-crop'
+                                      : 'Detection paused',
                                   style: const TextStyle(color: Colors.grey, fontSize: 16),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
                                   _isDetectionActive
-                                    ? 'Arahkan kamera ke plat nomor untuk auto-crop & OCR'
-                                    : 'Tekan tombol play untuk mulai detection',
+                                      ? 'Arahkan kamera ke plat nomor untuk auto-crop & OCR'
+                                      : 'Tekan tombol play untuk mulai detection',
                                   textAlign: TextAlign.center,
                                   style: const TextStyle(color: Colors.grey, fontSize: 12),
                                 ),
@@ -674,11 +665,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
         ),
         Text(
           label,
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.grey.shade700,
-            fontWeight: FontWeight.w500,
-          ),
+          style: TextStyle(fontSize: 12, color: Colors.grey.shade700, fontWeight: FontWeight.w500),
         ),
       ],
     );
@@ -707,10 +694,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   margin: const EdgeInsets.all(4),
-                  child: Image.memory(
-                    plate.imageBytes!,
-                    fit: BoxFit.contain,
-                  ),
+                  child: Image.memory(plate.imageBytes!, fit: BoxFit.contain),
                 ),
               )
             else
@@ -769,48 +753,45 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
                 decoration: BoxDecoration(
-                  color: plateData.isProcessingOCR 
-                    ? Colors.orange.withValues(alpha: 0.9)
-                    : plateData.ocrText != null
+                  color: plateData.isProcessingOCR
+                      ? Colors.orange.withValues(alpha: 0.9)
+                      : plateData.ocrText != null
                       ? Colors.green.withValues(alpha: 0.9)
                       : Colors.black.withValues(alpha: 0.8),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: plateData.isProcessingOCR
-                  ? const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        SizedBox(
-                          width: 8,
-                          height: 8,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 1.5,
-                            color: Colors.white,
+                    ? const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          SizedBox(
+                            width: 8,
+                            height: 8,
+                            child: CircularProgressIndicator(strokeWidth: 1.5, color: Colors.white),
                           ),
-                        ),
-                        SizedBox(width: 4),
-                        Text(
-                          'OCR...',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 7,
-                            fontWeight: FontWeight.bold,
+                          SizedBox(width: 4),
+                          Text(
+                            'OCR...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 7,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
+                        ],
+                      )
+                    : Text(
+                        plateData.ocrText ?? '${plate.width}×${plate.height}',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: plateData.ocrText != null ? 7 : 8,
+                          fontWeight: FontWeight.bold,
                         ),
-                      ],
-                    )
-                  : Text(
-                      plateData.ocrText ?? '${plate.width}×${plate.height}',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: plateData.ocrText != null ? 7 : 8,
-                        fontWeight: FontWeight.bold,
+                        textAlign: TextAlign.center,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                      textAlign: TextAlign.center,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
               ),
             ),
           ],
@@ -849,23 +830,33 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                       border: Border.all(color: Colors.grey.shade300),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Image.memory(
-                      plate.imageBytes!,
-                      height: 150,
-                      fit: BoxFit.contain,
-                    ),
+                    child: Image.memory(plate.imageBytes!, height: 150, fit: BoxFit.contain),
                   ),
                 ),
               const SizedBox(height: 16),
               _buildDetailRow('Class', plate.clsName, Icons.label),
-              _buildDetailRow('Confidence', '${(plate.confidence * 100).toStringAsFixed(2)}%', Icons.percent),
-              _buildDetailRow('Dimensions', '${plate.width} × ${plate.height} pixels', Icons.aspect_ratio),
-              _buildDetailRow('File Size', '${(plate.sizeBytes / 1024).toStringAsFixed(1)} KB', Icons.storage),
-              _buildDetailRow('Original Position', 
-                  '(${plate.originalBox.x1.toStringAsFixed(0)}, ${plate.originalBox.y1.toStringAsFixed(0)}) → '
-                  '(${plate.originalBox.x2.toStringAsFixed(0)}, ${plate.originalBox.y2.toStringAsFixed(0)})', 
-                  Icons.crop),
-              
+              _buildDetailRow(
+                'Confidence',
+                '${(plate.confidence * 100).toStringAsFixed(2)}%',
+                Icons.percent,
+              ),
+              _buildDetailRow(
+                'Dimensions',
+                '${plate.width} × ${plate.height} pixels',
+                Icons.aspect_ratio,
+              ),
+              _buildDetailRow(
+                'File Size',
+                '${(plate.sizeBytes / 1024).toStringAsFixed(1)} KB',
+                Icons.storage,
+              ),
+              _buildDetailRow(
+                'Original Position',
+                '(${plate.originalBox.x1.toStringAsFixed(0)}, ${plate.originalBox.y1.toStringAsFixed(0)}) → '
+                    '(${plate.originalBox.x2.toStringAsFixed(0)}, ${plate.originalBox.y2.toStringAsFixed(0)})',
+                Icons.crop,
+              ),
+
               // OCR Result Section
               const Divider(height: 24),
               Row(
@@ -879,7 +870,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                 ],
               ),
               const SizedBox(height: 8),
-              
+
               if (plateData.isProcessingOCR)
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -937,10 +928,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                           const SizedBox(width: 4),
                           Text(
                             'Valid: ${_ocrService.isValidIndonesianPlate(plateData.ocrText!) ? "Yes ✓" : "Unknown"}',
-                            style: TextStyle(
-                              color: Colors.green.shade700,
-                              fontSize: 11,
-                            ),
+                            style: TextStyle(color: Colors.green.shade700, fontSize: 11),
                           ),
                         ],
                       ),
@@ -987,7 +975,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
                     ],
                   ),
                 ),
-              
+
               const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -1012,12 +1000,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
             ],
           ),
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Close'),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
       ),
     );
   }
@@ -1037,12 +1020,7 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
               style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
             ),
           ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 12),
-            ),
-          ),
+          Expanded(child: Text(value, style: const TextStyle(fontSize: 12))),
         ],
       ),
     );
@@ -1063,7 +1041,9 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('This demo shows automatic license plate detection, cropping, and OCR using YOLO + ML Kit.'),
+            Text(
+              'This demo shows automatic license plate detection, cropping, and OCR using YOLO + ML Kit.',
+            ),
             SizedBox(height: 8),
             Text('Features:', style: TextStyle(fontWeight: FontWeight.bold)),
             Text('• Real-time license plate detection'),
@@ -1073,15 +1053,12 @@ class _LicensePlateCroppingScreenState extends State<LicensePlateCroppingScreen>
             Text('• User confirmation after OCR'),
             Text('• Confidence threshold adjustment'),
             SizedBox(height: 8),
-            Text('The system automatically pauses detection during OCR processing to save CPU/memory, then asks for confirmation before continuing.'),
+            Text(
+              'The system automatically pauses detection during OCR processing to save CPU/memory, then asks for confirmation before continuing.',
+            ),
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Got it'),
-          ),
-        ],
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Got it'))],
       ),
     );
   }
