@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ultralytics_yolo_example/state_util.dart';
 import 'theme.dart';
 import 'routes.dart';
 
@@ -8,18 +9,23 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'OCR Plat Nomor',
-      debugShowCheckedModeBanner: false,
-      
-      // Theme
-      theme: AppTheme.lightTheme,
-      // darkTheme: AppTheme.darkTheme, // Uncomment untuk dark mode support
-      
-      // Routing
-      initialRoute: AppRoutes.home,
-      routes: AppRoutes.routes,
-      onGenerateRoute: AppRoutes.generateRoute,
+    return ValueListenableBuilder(
+      valueListenable: Get.mainTheme,
+      builder: (context, value, child) {
+        return MaterialApp(
+          title: 'OCR Plat Nomor',
+          debugShowCheckedModeBanner: false,
+
+          // Theme
+          theme: AppTheme.lightTheme,
+          // darkTheme: AppTheme.darkTheme, // Uncomment untuk dark mode support
+
+          // Routing
+          initialRoute: AppRoutes.home,
+          routes: AppRoutes.routes,
+          onGenerateRoute: AppRoutes.generateRoute,
+        );
+      },
     );
   }
 }

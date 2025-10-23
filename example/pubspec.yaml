@@ -22,6 +22,23 @@ dependencies:
     path: ../
 
   cupertino_icons: ^1.0.8
+  google_fonts: ^6.3.2
+  # flutter_image_compress: ^2.4.0
+  geolocator: ^14.0.2
+  permission_handler: ^12.0.1
+  device_info_plus: ^12.2.0
+  dio: ^5.9.0
+  hive: ^2.2.3
+  lottie: ^3.3.0
+  flutter_svg: ^2.2.1
+  intl: ^0.20.2
+  validatorless: ^1.2.5
+  flutter_staggered_grid_view: ^0.7.0
+  ntp: ^2.0.0
+  pdf: ^3.11.3
+  printing: ^5.14.2
+  flutter_bluetooth_printer: 2.19.0
+  flutter_bluetooth_printer_platform_interface: ^0.0.7
 
 dev_dependencies:
   integration_test:
@@ -38,6 +55,17 @@ flutter:
     - assets/models/
     - assets/logo.png
     - assets/applogo.png
+    - assets/files/json/
+    - assets/icons/detail_kendaraan/
+    - assets/icons/input/
+    - assets/icons/misc/
+    - assets/icons/info/
+    - assets/icons/side_menu/
+    - assets/images/logo/
+    - assets/images/illustration/
+    - assets/images/layanan/
+    - assets/images/accent/
+    - assets/images/verifikasi/
 
 flutter_launcher_icons:
   android: true

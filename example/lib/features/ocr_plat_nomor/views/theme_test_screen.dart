@@ -8,9 +8,7 @@ class ThemeTestScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Theme Test'),
-      ),
+      appBar: AppBar(title: const Text('Theme Test')),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -21,27 +19,27 @@ class ThemeTestScreen extends StatelessWidget {
             Text('Display Medium', style: Theme.of(context).textTheme.displayMedium),
             Text('Display Small', style: Theme.of(context).textTheme.displaySmall),
             const SizedBox(height: 16),
-            
+
             // Headline styles
             Text('Headline Large', style: Theme.of(context).textTheme.headlineLarge),
             Text('Headline Medium', style: Theme.of(context).textTheme.headlineMedium),
             Text('Headline Small', style: Theme.of(context).textTheme.headlineSmall),
             const SizedBox(height: 16),
-            
+
             // Title styles
             Text('Title Large', style: Theme.of(context).textTheme.titleLarge),
             Text('Title Medium', style: Theme.of(context).textTheme.titleMedium),
             Text('Title Small', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 16),
-            
+
             // Body styles
             Text('Body Large', style: Theme.of(context).textTheme.bodyLarge),
             Text('Body Medium', style: Theme.of(context).textTheme.bodyMedium),
             Text('Body Small', style: Theme.of(context).textTheme.bodySmall),
             const SizedBox(height: 16),
-            
+
             // Color palette
-            Wrap(
+            const Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
@@ -55,22 +53,13 @@ class ThemeTestScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            
+
             // Buttons
-            ElevatedButton(
-              onPressed: () {},
-              child: const Text('Elevated Button'),
-            ),
+            ElevatedButton(onPressed: () {}, child: const Text('Elevated Button')),
             const SizedBox(height: 8),
-            TextButton(
-              onPressed: () {},
-              child: const Text('Text Button'),
-            ),
+            TextButton(onPressed: () {}, child: const Text('Text Button')),
             const SizedBox(height: 8),
-            OutlinedButton(
-              onPressed: () {},
-              child: const Text('Outlined Button'),
-            ),
+            OutlinedButton(onPressed: () {}, child: const Text('Outlined Button')),
           ],
         ),
       ),
