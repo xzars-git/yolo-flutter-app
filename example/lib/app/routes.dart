@@ -24,7 +24,10 @@ class AppRoutes {
           settings: settings,
         );
       case ocrPlatNomor:
-        return MaterialPageRoute(builder: (_) => const SimpleOCRTestScreen(), settings: settings);
+        return MaterialPageRoute(
+          builder: (_) => const LicensePlateCroppingScreen(),
+          settings: settings,
+        );
       case inputNopol:
         return MaterialPageRoute(
           builder: (_) => const InputNomorPolisiOcrView(),
@@ -50,13 +53,11 @@ class AppRoutes {
   static Map<String, WidgetBuilder> get routes {
     return {
       home: (context) => const InputNomorPolisiOcrView(),
-      ocrTest: (context) => const SimpleOCRTestScreen(),
       inputNopol: (context) => const InputNomorPolisiOcrView(),
       detailNopol: (context) {
         final args = ModalRoute.of(context)?.settings.arguments as DataKendaraan?;
         return DetailTelusurMandiriOcrView(dataKendaraan: args);
       },
-      home: (context) => const LicensePlateCroppingScreen(),
       ocrPlatNomor: (context) => const LicensePlateCroppingScreen(),
     };
   }
