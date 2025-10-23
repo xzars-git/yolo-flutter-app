@@ -12,6 +12,21 @@
   - **Usage**: `YOLOView(showOverlays: false)` now properly hides both Flutter and native overlays
   - **Dynamic Control**: Use `yoloController.setShowOverlays(false)` to toggle overlays at runtime
 
+- **Known Issues (Fork-Specific)**:
+  - **Double Overlay Bug**: Using `onResult` callback with `showOverlays: true` causes duplicate bounding boxes
+    - **Root Cause**: `onResult` triggers `setState()` → widget rebuild → second `overlayView.invalidate()` call
+    - **Workaround**: Use `onStreamingData` instead of `onResult` for detection tracking
+    - **Solution**: `onStreamingData` is data-only callback isolated from overlay rendering pipeline
+    - Set `includeDetections: true` in `YOLOStreamingConfig` to receive detection data
+    - All `onResult` functionality can be implemented via `onStreamingData`
+  
+  - **Automatic Cropping Feature**: Backported from custom fork for ALPR use cases
+    - **Android**: Added `ImageCropper.kt` utility class for object cropping
+    - **Android**: Integrated cropping with `YOLOStreamingConfig.cropDetectedObjects`
+    - **Android**: Fixed rotation issues for portrait mode camera frames
+    - **Flutter**: Added `onCroppedImages` callback to receive cropped object images
+    - **Usage**: See README for code examples with OCR integration
+
 ## 0.1.38
 
 - **Bug Fix**: iOS performance metrics not updating in `YOLOView`
