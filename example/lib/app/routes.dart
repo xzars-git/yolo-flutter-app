@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:ultralytics_yolo_example/features/bukti_penelusuran_ocr/view/bukti_penelusuran_ocr_view.dart';
 import 'package:ultralytics_yolo_example/features/detail_telusur_mandiri_ocr/view/detail_telusur_mandiri_ocr_view.dart';
 import 'package:ultralytics_yolo_example/features/input_nomor_polisi_ocr/view/input_nomor_polisi_ocr_view.dart';
 import 'package:ultralytics_yolo_example/model/data_besaran_pajak.dart';
@@ -14,6 +15,7 @@ class AppRoutes {
   static const String ocrPlatNomor = '/ocr-plat-nomor';
   static const String inputNopol = '/input-nopol';
   static const String detailNopol = '/detail-nopol';
+  static const String buktiTelusur = '/bukti-telusur';
 
   /// Route generator
   static Route<dynamic> generateRoute(RouteSettings settings) {
@@ -38,6 +40,11 @@ class AppRoutes {
           builder: (_) => const LicensePlateCroppingScreen(),
           settings: settings,
         );
+      case buktiTelusur:
+        return MaterialPageRoute(
+          builder: (_) => const BuktiPenelusuranOcrView(),
+          settings: settings,
+        );
 
       default:
         return MaterialPageRoute(
@@ -55,10 +62,18 @@ class AppRoutes {
       home: (context) => const InputNomorPolisiOcrView(),
       inputNopol: (context) => const InputNomorPolisiOcrView(),
       detailNopol: (context) {
-        final args = ModalRoute.of(context)?.settings.arguments as DataKendaraan?;
-        return DetailTelusurMandiriOcrView(dataKendaraan: args);
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final dataKendaraan = args != null ? args['dataKendaraan'] as DataKendaraan? : null;
+        final kodePlat = args != null ? args['kodePlat'] as String? : null;
+        return DetailTelusurMandiriOcrView(dataKendaraan: dataKendaraan, kodePlat: kodePlat);
       },
       ocrPlatNomor: (context) => const LicensePlateCroppingScreen(),
+      buktiTelusur: (context) {
+        final args = ModalRoute.of(context)?.settings.arguments as Map<String, dynamic>?;
+        final dataKendaraan = args != null ? args['dataKendaraan'] as DataKendaraan? : null;
+        final kodePlat = args != null ? args['kodePlat'] as String? : null;
+        return BuktiPenelusuranOcrView(dataKendaraan: dataKendaraan, kodePlat: kodePlat);
+      },
     };
   }
 }
