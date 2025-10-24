@@ -4,15 +4,16 @@ import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:ntp/ntp.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:ultralytics_yolo_example/app/routes.dart';
 import 'package:ultralytics_yolo_example/features/input_nomor_polisi_ocr/view/input_nomor_polisi_ocr_view.dart';
 import 'package:ultralytics_yolo_example/model/data_besaran_pajak.dart';
 import 'package:ultralytics_yolo_example/model/update_nopol_model.dart';
 import 'package:ultralytics_yolo_example/service/api_service.dart';
-import 'package:ultralytics_yolo_example/state_util.dart';
 import 'package:ultralytics_yolo_example/theme/theme_config.dart';
 import 'package:ultralytics_yolo_example/util/check_connection/check_connection.dart';
 import 'package:ultralytics_yolo_example/util/dialog/show_info_dialog.dart';
+import 'package:ultralytics_yolo_example/util/request_permmision.dart';
 
 import '../../../app/theme.dart';
 import '../../../service/ocr_service.dart';
@@ -32,7 +33,51 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
     WidgetsBinding.instance.addPostFrameCallback((_) => onReady());
   }
 
-  void onReady() {}
+  void onReady() async {
+    // ✅ CEK permission dulu sebelum request
+    try {
+      debugPrint('🔐 Checking permissions...');
+      setState(() {
+        isRequestingPermissions = true;
+        ocrStatusMessage = '🔐 Mengecek izin akses...';
+      });
+      
+      // CEK status permission saat ini
+      final cameraStatus = await Permission.camera.status;
+      final locationStatus = await Permission.location.status;
+      
+      debugPrint('📊 Permission status: camera=$cameraStatus, location=$locationStatus');
+      
+      // Hanya request jika BELUM granted
+      if (!cameraStatus.isGranted || !locationStatus.isGranted) {
+        debugPrint('⚠️ Some permissions not granted, requesting...');
+        await requestPermissions();
+      } else {
+        debugPrint('✅ All permissions already granted, skip request');
+      }
+      
+      // ✅ CRITICAL: Set flag dan force rebuild untuk initialize camera
+      setState(() {
+        isPermissionsGranted = true;
+        isRequestingPermissions = false;
+        ocrStatusMessage = 'Terhubung ke printer COMSON 77';
+      });
+      
+      // ✅ Delay kecil untuk ensure camera widget rebuild
+      await Future.delayed(const Duration(milliseconds: 300));
+      
+      if (mounted && !isInputNopol) {
+        debugPrint('🎥 Camera initialized');
+      }
+    } catch (e) {
+      debugPrint('⚠️ Permission error: $e');
+      setState(() {
+        isPermissionsGranted = false;
+        isRequestingPermissions = false;
+        ocrStatusMessage = '❌ Izin akses ditolak';
+      });
+    }
+  }
 
   @override
   void dispose() {
@@ -145,16 +190,27 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
   bool isDetectionActive = true;
   bool isProcessing = false;
   
+  // ✅ Flag untuk track permission status
+  bool isPermissionsGranted = false;
+  bool isRequestingPermissions = true;
+  
   DateTime lastCallbackTime = DateTime.now();
   static const callbackDebounceMs = 300;
 
   
+  /// Update UI
+  void update() {
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
   /// Resume detection setelah OCR selesai
   void resumeDetection() {
     setState(() {
       isDetectionActive = true;
       isProcessing = false;
-      ocrStatusMessage = '🔍 Detection resumed - Arahkan kamera ke plat nomor...';
+      ocrStatusMessage = 'Terhubung ke printer COMSON 77';
     });
   }
 
@@ -163,7 +219,7 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
     setState(() {
       isDetectionActive = false;
       isProcessing = false;
-      ocrStatusMessage = '⏹️ Detection stopped - Tekan tombol untuk mulai lagi';
+      ocrStatusMessage = '⏹️ Detection stopped - Input manual atau beralih ke scan';
     });
   }
 
@@ -172,8 +228,36 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
     setState(() {
       isDetectionActive = true;
       isProcessing = false;
-      ocrStatusMessage = '🔍 Detection started - Arahkan kamera ke plat nomor...';
+      ocrStatusMessage = 'Terhubung ke printer COMSON 77';
     });
+  }
+
+  /// ✅ Helper: Normalisasi karakter menjadi HURUF (untuk nopol1 & nopol3)
+  /// Konversi angka yang mirip huruf:
+  /// - 0 → O, 1 → I, 4 → A, 5 → S, 8 → B, 3 → E
+  String _normalizeToLetters(String text) {
+    return text
+        .replaceAll('0', 'O')
+        .replaceAll('1', 'I')
+        .replaceAll('4', 'A')
+        .replaceAll('5', 'S')
+        .replaceAll('8', 'B')
+        .replaceAll('3', 'E')
+        .toUpperCase();
+  }
+
+  /// ✅ Helper: Normalisasi karakter menjadi ANGKA (untuk nopol2)
+  /// Konversi huruf yang mirip angka:
+  /// - O → 0, I → 1, A → 4, S → 5, B → 8, E → 3
+  String _normalizeToDigits(String text) {
+    return text
+        .replaceAll('O', '0')
+        .replaceAll('I', '1')
+        .replaceAll('A', '4')
+        .replaceAll('S', '5')
+        .replaceAll('B', '8')
+        .replaceAll('E', '3')
+        .toUpperCase();
   }
 
   Future<void> processOCR(PlateData plateData, int index) async {
@@ -210,23 +294,33 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
           plateData.isProcessingOCR = false;
           
           if (ocrText != null && ocrText.isNotEmpty) {
+            debugPrint('📄 OCR Raw Result: "$ocrText"');
+            
+            // ✅ TIDAK LAGI VALIDASI REGEX DI SINI - Biarkan OCR berhasil
+            // Validasi akan dilakukan saat parsing untuk hit API
+            
             final formatted = ocrService.formatLicensePlate(ocrText);
-            plateData.ocrText = formatted;
+            plateData.ocrText = formatted.isNotEmpty ? formatted : ocrText; // Use original if format fails
             plateData.ocrError = null;
             totalOCRSuccess++;
             
-            ocrStatusMessage = '🚀 Checking pajak info via API...';
+            ocrStatusMessage = '� OCR: "$ocrText" - Checking pajak...';
+            debugPrint('✅ OCR Success: "$ocrText" (formatted: "${plateData.ocrText}")');
           } else {
             plateData.ocrError = 'Tidak ada text terdeteksi';
             ocrStatusMessage = '⚠️ OCR tidak menemukan text';
+            debugPrint('⚠️ OCR returned empty text');
           }
         });
         
-        // Hit API jika OCR berhasil
+        // ✅ Hit API langsung jika OCR berhasil ekstrak text (apapun textnya)
         if (plateData.ocrText != null && plateData.ocrText!.isNotEmpty) {
+          // TETAP PAUSE DETECTION - akan di-resume setelah user konfirmasi dari dialog API result
           checkPajakInfo(plateData.ocrText!);
         } else {
-          showOCRResultDialog(plateData);
+          // OCR gagal ekstrak text, resume detection untuk coba lagi
+          ocrStatusMessage = '❌ OCR gagal ekstrak text - Mencoba lagi...';
+          resumeDetection();
         }
       }
     } catch (e) {
@@ -234,10 +328,11 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
         setState(() {
           plateData.isProcessingOCR = false;
           plateData.ocrError = 'OCR Error: $e';
-          ocrStatusMessage = '❌ OCR Error';
+          ocrStatusMessage = '❌ OCR Error - Mencoba lagi...';
         });
         
-        showOCRResultDialog(plateData);
+        // OCR error, langsung resume detection tanpa dialog
+        resumeDetection();
       }
     }
   }
@@ -389,6 +484,164 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
                   ),
                 ),
               ],
+      ),
+    );
+  }
+
+  /// Show dialog untuk kendaraan TAAT PAJAK
+  void _showPajakTaatDialogWithData(String platNomor, DataBesaranPajakResult pajakInfo) {
+    final data = pajakInfo.data;
+    final String namaPemilik = data?.nmPemilik ?? '-';
+    final String merkKB = data?.nmMerekKb ?? '-';
+    final String modelKB = data?.nmModelKb ?? '-';
+    final String warnaKB = data?.warnaKb ?? '-';
+    final String tglAkhirPajak = data?.tgAkhirPajak ?? '-';
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppTheme.radiusM)),
+        title: Row(
+          children: [
+            Icon(
+              Icons.check_circle,
+              color: AppTheme.successColor,
+              size: 28,
+            ),
+            const SizedBox(width: 12),
+            const Expanded(
+              child: Text(
+                'Taat Pajak',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.successColor,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.blue50, AppTheme.blue100],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppTheme.blue600, width: 2),
+                ),
+                child: Center(
+                  child: Text(
+                    platNomor,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 4,
+                      color: AppTheme.blue900,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.green50,
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.green600, width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.verified,
+                      color: AppTheme.green700,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Kendaraan ini TAAT PAJAK ✅',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppTheme.green900,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const Divider(height: 24, color: AppTheme.gray300),
+              const Text(
+                '📋 Informasi Kendaraan',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppTheme.gray900),
+              ),
+              const SizedBox(height: 12),
+              buildInfoRowPajakInformation('Pemilik', namaPemilik),
+              buildInfoRowPajakInformation('Merk', merkKB),
+              buildInfoRowPajakInformation('Model', modelKB),
+              buildInfoRowPajakInformation('Warna', warnaKB),
+              const SizedBox(height: 8),
+              
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppTheme.green50, AppTheme.green100],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(6),
+                  border: Border.all(color: AppTheme.green600, width: 2),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Status Pajak',
+                      style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: AppTheme.gray900),
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Text(
+                          'AKTIF',
+                          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppTheme.green900),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Berlaku s/d $tglAkhirPajak',
+                          style: const TextStyle(fontSize: 11, color: AppTheme.gray600),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton.icon(
+            onPressed: () {
+              Navigator.pop(context);
+              resumeDetection();
+            },
+            icon: const Icon(Icons.refresh, color: AppTheme.blue600),
+            label: const Text('Deteksi Lagi', style: TextStyle(color: AppTheme.blue600)),
+          ),
+        ],
       ),
     );
   }
@@ -594,19 +847,53 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
   void checkPajakInfo(String platNomor) async {
     setState(() {
       isCheckingAPI = true;
-      ocrStatusMessage = '🚀 Checking pajak info via API...';
+      ocrStatusMessage = '🚀 OCR: "$platNomor" - Checking API...';
     });
 
     try {
       await checkConnection();
       
       // Parse plat nomor dari format "AB 1234 CD" ke noPolisi1, noPolisi2, noPolisi3
-      final parts = platNomor.split(' ');
-      if (parts.length >= 3) {
-        noPolisi1 = parts[0]; // AB
-        noPolisi2 = parts[1]; // 1234
-        noPolisi3 = parts[2]; // CD
+      final parts = platNomor.trim().split(RegExp(r'\s+'));
+      
+      debugPrint('📊 Parsing plate number: "$platNomor"');
+      debugPrint('   Parts: ${parts.join(", ")} (total: ${parts.length})');
+      
+      // ✅ VALIDASI SEDERHANA: Cek ada 3 part saja
+      if (parts.length != 3) {
+        debugPrint('⚠️ Invalid plate format: need exactly 3 parts, got ${parts.length}');
+        setState(() {
+          isCheckingAPI = false;
+          ocrStatusMessage = '⚠️ Format tidak lengkap - Mencoba lagi...';
+        });
+        
+        // Format tidak valid, langsung resume detection tanpa dialog
+        resumeDetection();
+        return;
       }
+      
+      // ✅ NORMALISASI HANYA 1 KALI - Di sini sebelum hit API
+      // nopol1 & nopol3: Angka yang mirip huruf → Huruf (0→O, 1→I, 4→A, 5→S, 8→B)
+      // nopol2: Huruf yang mirip angka → Angka (O→0, I→1, A→4, S→5, B→8)
+      String nopol1Raw = parts[0].toUpperCase();
+      String nopol2Raw = parts[1].toUpperCase();
+      String nopol3Raw = parts[2].toUpperCase();
+      
+      noPolisi1 = _normalizeToLetters(nopol1Raw);
+      noPolisi2 = _normalizeToDigits(nopol2Raw);
+      noPolisi3 = _normalizeToLetters(nopol3Raw);
+      
+      debugPrint('🔄 Normalization:');
+      debugPrint('   nopol1: "$nopol1Raw" → "$noPolisi1"');
+      debugPrint('   nopol2: "$nopol2Raw" → "$noPolisi2"');
+      debugPrint('   nopol3: "$nopol3Raw" → "$noPolisi3"');
+      
+      final normalizedPlate = '$noPolisi1 $noPolisi2 $noPolisi3';
+      debugPrint('✅ Final normalized plate: "$normalizedPlate"');
+      
+      setState(() {
+        ocrStatusMessage = '🚀 Checking: "$normalizedPlate"';
+      });
 
       final result = await ApiService.getBesaranPajak(
         noPolisi1: noPolisi1,
@@ -622,13 +909,35 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
       });
 
       if (result.success == true && result.data != null) {
+        ocrStatusMessage = '✅ Data ditemukan!';
+        
+        // Check tgl akhir pajak
         DateTime now = await NTP.now();
         DateTime tgAkhirPajakDate = DateTime.parse(result.data?.tgAkhirPajak ?? "");
 
-        if (mounted) {
-          showPajakResultDialog(platNomor, result, isSuccess: true);
+        if (tgAkhirPajakDate.isBefore(now)) {
+          // Pajak sudah lewat - navigate ke detail
+          debugPrint('❌ Pajak EXPIRED - Navigate to detail');
+          if (mounted) {
+            Navigator.pushNamed(
+              context,
+              AppRoutes.detailNopol,
+              arguments: {"dataKendaraan": result.data, "kodePlat": kodePlat},
+            );
+          }
+        } else {
+          // Pajak masih aktif (taat pajak) - show dialog
+          debugPrint('✅ Pajak ACTIVE - Show taat pajak dialog');
+          if (mounted) {
+            _showPajakTaatDialogWithData(platNomor, result);
+          }
         }
       } else {
+        // Data tidak ditemukan
+        debugPrint('⚠️ Data not found: ${result.message}');
+        setState(() {
+          ocrStatusMessage = '❌ Data tidak ditemukan';
+        });
         if (mounted) {
           showPajakResultDialog(platNomor, result, isSuccess: false);
         }

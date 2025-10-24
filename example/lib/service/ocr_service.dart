@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:image/image.dart' as img;
 
 
 class OCRService {
@@ -36,6 +37,9 @@ class OCRService {
     try {
       debugPrint('🔍 OCR: Processing image (${imageBytes.length} bytes)...');
 
+      // ✅ STEP 1: Preprocess image untuk meningkatkan akurasi OCR
+      Uint8List enhancedBytes = await _enhanceImageForOCR(imageBytes);
+      debugPrint('✨ OCR: Image enhanced (${enhancedBytes.length} bytes)');
 
       final tempDir = await getTemporaryDirectory();
       final tempFile = File(
@@ -43,9 +47,9 @@ class OCRService {
       );
 
       try {
-        // Write JPEG bytes to temp file
-        await tempFile.writeAsBytes(imageBytes);
-        debugPrint('📝 OCR: Saved temp file: ${tempFile.path}');
+        // Write enhanced JPEG bytes to temp file
+        await tempFile.writeAsBytes(enhancedBytes);
+        debugPrint('📝 OCR: Saved enhanced temp file: ${tempFile.path}');
 
         // Create InputImage from file path (ini cara yang benar untuk JPEG)
         final inputImage = InputImage.fromFilePath(tempFile.path);
@@ -58,19 +62,28 @@ class OCRService {
         await tempFile.delete();
         debugPrint('🗑️ OCR: Temp file deleted');
 
+        debugPrint('📊 OCR Results:');
+        debugPrint('   Blocks found: ${recognizedText.blocks.length}');
+        debugPrint('   Full text: "${recognizedText.text}"');
+        
+        // Log detailed block information
+        for (int i = 0; i < recognizedText.blocks.length; i++) {
+          final block = recognizedText.blocks[i];
+          debugPrint('   Block $i: "${block.text}" (${block.lines.length} lines)');
+          for (int j = 0; j < block.lines.length; j++) {
+            final line = block.lines[j];
+            debugPrint('     Line $j: "${line.text}" (confidence: ${_estimateConfidence(line)})');
+          }
+        }
+
         if (recognizedText.text.isEmpty) {
           debugPrint('⚠️ No text detected in image');
-          debugPrint('   Blocks found: ${recognizedText.blocks.length}');
           return null;
         }
 
         // Extract and clean the text
         String extractedText = recognizedText.text;
         debugPrint('📄 OCR Raw text: "$extractedText"');
-        debugPrint('   Blocks: ${recognizedText.blocks.length}');
-        debugPrint(
-          '   Lines: ${recognizedText.blocks.map((b) => b.lines.length).reduce((a, b) => a + b)}',
-        );
 
         // Clean up the text (remove extra spaces, newlines, etc)
         extractedText = _cleanLicensePlateText(extractedText);
@@ -87,6 +100,61 @@ class OCRService {
       debugPrint('❌ OCR Error: $e');
       debugPrint('   Stack trace: $stackTrace');
       return null;
+    }
+  }
+
+  /// ✨ Enhance image untuk meningkatkan akurasi OCR
+  Future<Uint8List> _enhanceImageForOCR(Uint8List imageBytes) async {
+    try {
+      // Decode image
+      img.Image? image = img.decodeImage(imageBytes);
+      if (image == null) {
+        debugPrint('⚠️ Failed to decode image, using original');
+        return imageBytes;
+      }
+
+      debugPrint('🖼️ Original image: ${image.width}x${image.height}');
+
+      // ✅ STEP 1: Resize jika terlalu kecil (min 200px width for better OCR)
+      if (image.width < 200) {
+        final scaleFactor = 200 / image.width;
+        image = img.copyResize(
+          image,
+          width: 200,
+          height: (image.height * scaleFactor).round(),
+          interpolation: img.Interpolation.cubic,
+        );
+        debugPrint('📐 Resized to: ${image.width}x${image.height}');
+      }
+
+      // ✅ STEP 2: Increase contrast untuk teks lebih jelas
+      image = img.adjustColor(
+        image,
+        contrast: 1.3, // Increase contrast
+        brightness: 1.1, // Slightly brighter
+      );
+      debugPrint('🎨 Enhanced contrast and brightness');
+
+      // ✅ STEP 3: Sharpen untuk edge detection lebih baik
+      image = img.convolution(
+        image,
+        filter: [0, -1, 0, -1, 5, -1, 0, -1, 0], // Sharpen kernel
+      );
+      debugPrint('🔪 Sharpened image');
+
+      // ✅ STEP 4: Convert to grayscale untuk OCR lebih fokus
+      // (License plates biasanya hitam text on white/colored background)
+      image = img.grayscale(image);
+      debugPrint('⚫ Converted to grayscale');
+
+      // Encode back to JPEG with high quality
+      final enhancedBytes = img.encodeJpg(image, quality: 95);
+      debugPrint('✅ Image enhancement complete');
+
+      return Uint8List.fromList(enhancedBytes);
+    } catch (e) {
+      debugPrint('⚠️ Image enhancement failed: $e, using original');
+      return imageBytes;
     }
   }
 
@@ -173,25 +241,85 @@ class OCRService {
   String formatLicensePlate(String text) {
     if (text.isEmpty) return text;
 
-    // Remove all spaces first
-    String cleaned = text.replaceAll(' ', '');
+    // ✅ CERDAS: Parse berdasarkan POLA HURUF-ANGKA-HURUF
+    // TIDAK ADA NORMALISASI - Biarkan hasil OCR asli
+    String cleaned = text.replaceAll(' ', '').toUpperCase();
 
-    // ✅ REGEX INDONESIA KETAT:
-    // - Wilayah: 1-2 HURUF (B, DK, AB, dll) - kode wilayah
-    // - Nomor: 1-4 ANGKA (1, 123, 1234, dll) - nomor kendaraan
-    // - Seri: 1-3 HURUF (T, T8R, ABC, dll) - seri plat
-    // Format: [HURUF][ANGKA][HURUF] - WAJIB!
-    final RegExp pattern = RegExp(r'^([A-Z]{1,2})(\d{1,4})([A-Z]{1,3})$');
-    final match = pattern.firstMatch(cleaned);
-
-    if (match != null) {
-      String wilayah = match.group(1)!; 
-      String nomor = match.group(2)!; 
-      String seri = match.group(3)!;
-
-      return '$wilayah $nomor $seri'; 
+    debugPrint('🔍 Parsing: "$cleaned"');
+    
+    // ✅ STRATEGI 1: Ideal case - HURUF + ANGKA + HURUF
+    final idealPattern = RegExp(r'^([A-Z]{1,2})([0-9]{1,4})([A-Z]{1,3})$');
+    var idealMatch = idealPattern.firstMatch(cleaned);
+    if (idealMatch != null) {
+      String part1 = idealMatch.group(1)!;
+      String part2 = idealMatch.group(2)!;
+      String part3 = idealMatch.group(3)!;
+      debugPrint('✅ Ideal match: "$part1 $part2 $part3"');
+      return '$part1 $part2 $part3';
+    }
+    
+    // ✅ STRATEGI 2: STRICT parsing with MAX constraints
+    // Format: [1-2 chars] [1-4 chars] [1-3 chars]
+    // Rule: nopol1 MAX 2, nopol2 MAX 4, nopol3 MAX 3
+    if (cleaned.length >= 5) { // Minimal "E1T" = 3 chars
+      
+      // STEP 1: Ambil nopol1 (1-2 chars dari DEPAN)
+      int part1Length = 1; // Default 1 char
+      // Ambil 2 chars jika char kedua BUKAN digit (untuk DK, AB, dll)
+      if (cleaned.length > 1) {
+        final char2 = cleaned[1];
+        // Ambil 2 hanya jika bukan digit DAN total string cukup panjang
+        if (!RegExp(r'[0-9]').hasMatch(char2) && cleaned.length > 3) {
+          part1Length = 2;
+        }
+      }
+      
+      // STEP 2: Ambil nopol3 (MAX 3 chars dari BELAKANG)
+      // Cari berapa banyak huruf/angka di akhir, max 3
+      int part3Length = 0;
+      for (int i = cleaned.length - 1; i >= part1Length && part3Length < 3; i--) {
+        part3Length++;
+      }
+      // Minimal harus ada 1 char untuk part3
+      if (part3Length < 1) part3Length = 1;
+      // Max 3 chars
+      if (part3Length > 3) part3Length = 3;
+      
+      // STEP 3: Part2 adalah SISANYA (harus 1-4 chars)
+      int part2Length = cleaned.length - part1Length - part3Length;
+      
+      // ✅ VALIDASI: part2 tidak boleh lebih dari 4!
+      if (part2Length > 4) {
+        // Kurangi part3Length, pindahkan ke part2
+        int excess = part2Length - 4;
+        part3Length += excess;
+        part2Length = 4;
+        
+        // Double check: part3Length tidak boleh lebih dari 3
+        if (part3Length > 3) {
+          // Pindahkan kelebihan ke part2 (relax constraint)
+          int part3Excess = part3Length - 3;
+          part2Length += part3Excess;
+          part3Length = 3;
+        }
+      }
+      
+      // Validasi final: semua part minimal 1 char
+      if (part1Length >= 1 && part2Length >= 1 && part3Length >= 1) {
+        int part1End = part1Length;
+        int part2End = part1End + part2Length;
+        
+        String part1 = cleaned.substring(0, part1End);
+        String part2 = cleaned.substring(part1End, part2End);
+        String part3 = cleaned.substring(part2End);
+        
+        debugPrint('📋 STRICT split: "$part1 $part2 $part3" (lengths: ${part1.length}-${part2.length}-${part3.length})');
+        return '$part1 $part2 $part3';
+      }
     }
 
+    // Jika gagal parse, return as-is
+    debugPrint('⚠️ Could not parse: "$cleaned"');
     return text;
   }
 
