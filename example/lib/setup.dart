@@ -11,6 +11,7 @@ import 'package:ultralytics_yolo_example/model/data_wilayah_result.dart';
 import 'package:ultralytics_yolo_example/model/kriteria_telusur_result.dart';
 import 'package:ultralytics_yolo_example/model/login_result.dart';
 import 'package:ultralytics_yolo_example/service/main_storage_service/main_storage.dart';
+import 'package:ultralytics_yolo_example/service/bluetooth_printer_service.dart';
 import 'package:ultralytics_yolo_example/session.dart';
 
 Future initialize() async {
@@ -50,4 +51,7 @@ Future initialize() async {
   DataWilayahDatabase.load();
   DataKriteriaDatabase.load();
   AppSession.load();
+
+  // Initialize Bluetooth Printer Service
+  await BluetoothPrinterService().initialize();
 }
