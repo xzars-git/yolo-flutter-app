@@ -3,14 +3,14 @@
 library ocr_plat_nomor;
 
 // Models
-export 'models/ocr_result.dart';
+export '../input_nomor_polisi_ocr/models/ocr_result.dart';
 export 'models/pajak_info.dart';
 
 // Controllers
 export 'controllers/ocr_controller.dart';
 
 // Services
-export 'services/ocr_service.dart' hide OCRResult; // Hide internal OCRResult class (for confidence scores)
+export '../../service/ocr_service.dart' hide OCRResult; // Hide internal OCRResult class (for confidence scores)
 export 'services/pajak_service.dart';
 
 // Screens

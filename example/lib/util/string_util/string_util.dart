@@ -35,6 +35,13 @@ checkNull(String? string) {
   }
 }
 
+ String formatCurrency(int amount) {
+    return amount.toString().replaceAllMapped(
+      RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+      (Match m) => '${m[1]}.',
+    );
+  }
+
 String splitString(String? originalString, bool isFirstString) {
   if (originalString != null || originalString != "") {
     RegExp regExp = RegExp(r'^(.*?) - (.*?)$');

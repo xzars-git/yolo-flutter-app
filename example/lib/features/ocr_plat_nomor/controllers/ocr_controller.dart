@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import '../models/ocr_result.dart';
-import '../services/ocr_service.dart' hide OCRResult; // Hide internal OCRResult class
+import '../../input_nomor_polisi_ocr/models/ocr_result.dart';
+import '../../../service/ocr_service.dart' hide OCRResult; // Hide internal OCRResult class
 import '../services/pajak_service.dart';
 
 /// Controller untuk OCR Screen
