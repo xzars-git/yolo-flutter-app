@@ -39,6 +39,7 @@ dependencies:
   printing: ^5.14.2
   flutter_bluetooth_printer: 2.19.0
   flutter_bluetooth_printer_platform_interface: ^0.0.7
+  shared_preferences: ^2.3.5
 
 dev_dependencies:
   integration_test:
