@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:ultralytics_yolo_example/features/bukti_penelusuran_ocr/controller/bukti_penelusuran_ocr_controller.dart';
 import 'package:ultralytics_yolo_example/features/bukti_penelusuran_ocr/widget/dashed_container.dart';
-import 'package:ultralytics_yolo_example/features/ocr_plat_nomor/screens/license_plate_cropping_screen.dart';
+import 'package:ultralytics_yolo_example/features/input_nomor_polisi_ocr/view/input_nomor_polisi_ocr_view.dart';
 import 'package:ultralytics_yolo_example/model/data_besaran_pajak.dart';
 import 'package:ultralytics_yolo_example/state_util.dart';
 import 'package:ultralytics_yolo_example/util/reference.dart';
@@ -41,7 +41,7 @@ class BuktiPenelusuranOcrView extends StatefulWidget {
                     if (isSucces) {
                       controller.pathPhoto = "";
                       controller.update();
-                      Get.offAll(const LicensePlateCroppingScreen());
+                      Get.offAll(const InputNomorPolisiOcrView());
                     } else {
                       showCustomSnackBar(context, "Gagal mengupload foto");
                     }
