@@ -84,7 +84,12 @@ class InputNomorPolisiOcrController extends State<InputNomorPolisiOcrView> {
 
         if (tgAkhirPajak.isBefore(now)) {
           // Get.to(DetailTelusurMandiriOcrView(dataKendaraan: result.data));
-          Navigator.pushNamed(context, AppRoutes.detailNopol, arguments: result.data);
+          Navigator.pushNamed(
+            // ignore: use_build_context_synchronously
+            context,
+            AppRoutes.detailNopol,
+            arguments: {"dataKendaraan": result.data, "kodePlat": kodePlat},
+          );
         } else {
           await showInfoDialog("Nomor polisi yang Anda masukkan Taat pajak.");
         }

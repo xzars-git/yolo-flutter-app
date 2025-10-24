@@ -21,6 +21,7 @@ class MyApp extends StatelessWidget {
           // darkTheme: AppTheme.darkTheme, // Uncomment untuk dark mode support
 
           // Routing
+          navigatorKey: Get.navigatorKey,
           initialRoute: AppRoutes.home,
           routes: AppRoutes.routes,
           onGenerateRoute: AppRoutes.generateRoute,

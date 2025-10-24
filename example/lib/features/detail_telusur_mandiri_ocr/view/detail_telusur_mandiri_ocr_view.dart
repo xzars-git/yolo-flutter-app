@@ -3,6 +3,7 @@ import 'package:flutter_bluetooth_printer/flutter_bluetooth_printer.dart';
 import 'package:flutter_staggered_grid_view/flutter_staggered_grid_view.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:printing/printing.dart';
+import 'package:ultralytics_yolo_example/app/routes.dart';
 import 'package:ultralytics_yolo_example/features/detail_telusur_mandiri_ocr/controller/detail_telusur_mandiri_ocr_controller.dart';
 import 'package:ultralytics_yolo_example/features/detail_telusur_mandiri_ocr/utils/detail_telusur_mandiri_ocr_utils.dart';
 import 'package:ultralytics_yolo_example/features/detail_telusur_mandiri_ocr/utils/pajak_pdf_generator.dart';
@@ -15,7 +16,8 @@ import 'package:ultralytics_yolo_example/widget/card/custom_expansion_tile.dart'
 
 class DetailTelusurMandiriOcrView extends StatefulWidget {
   final DataKendaraan? dataKendaraan;
-  const DetailTelusurMandiriOcrView({super.key, this.dataKendaraan});
+  final String? kodePlat;
+  const DetailTelusurMandiriOcrView({super.key, this.dataKendaraan, this.kodePlat});
 
   Widget build(context, DetailTelusurMandiriOcrController controller) {
     controller.view = this;
@@ -92,6 +94,13 @@ class DetailTelusurMandiriOcrView extends StatefulWidget {
 
                                   debugPrint('Printed page ${i + 1}');
                                 }
+
+                                Navigator.pushNamed(
+                                  // ignore: use_build_context_synchronously
+                                  context,
+                                  AppRoutes.buktiTelusur,
+                                  arguments: {"dataKendaraan": dataKendaraan, "kodePlat": kodePlat},
+                                );
                               } catch (e) {
                                 debugPrint('Failed to print PDF: $e');
                               }
@@ -264,75 +273,6 @@ class DetailTelusurMandiriOcrView extends StatefulWidget {
                   ),
                 ],
               ),
-
-              // Bluetooth Printer Device List
-              // const SizedBox(height: 16.0),
-              // ListenableBuilder(
-              //   listenable: printerService,
-              //   builder: (context, child) {
-              //     if (controller.printerService.discoveredDevices.isEmpty) {
-              //       return const SizedBox.shrink();
-              //     }
-
-              //     return Container(
-              //       decoration: BoxDecoration(
-              //         color: neutralWhite,
-              //         borderRadius: const BorderRadius.all(Radius.circular(8.0)),
-              //         border: Border.all(color: blueGray50, width: 1.0),
-              //       ),
-              //       child: Column(
-              //         crossAxisAlignment: CrossAxisAlignment.start,
-              //         children: [
-              //           Padding(
-              //             padding: const EdgeInsets.all(16.0),
-              //             child: Text("Printer Tersedia", style: myTextTheme.titleMedium),
-              //           ),
-              //           const Divider(height: 1),
-              //           ListView.separated(
-              //             shrinkWrap: true,
-              //             physics: const NeverScrollableScrollPhysics(),
-              //             itemCount: controller.printerService.discoveredDevices.length,
-              //             separatorBuilder: (context, index) => const Divider(height: 1),
-              //             itemBuilder: (context, index) {
-              //               final device = controller.printerService.discoveredDevices[index];
-              //               final isSelected =
-              //                   controller.printerService.selectedDevice?.address == device.address;
-
-              //               return InkWell(
-              //                 onTap: () async {
-              //                   await controller.printerService.connectToDevice(device.address);
-              //                 },
-              //                 child: Container(
-              //                   color: isSelected ? blue50 : null,
-              //                   child: ListTile(
-              //                     leading: Icon(
-              //                       Icons.print,
-              //                       color: isSelected ? blue900 : blueGray400,
-              //                     ),
-              //                     title: Text(
-              //                       device.name ?? "Unknown",
-              //                       style: myTextTheme.bodyMedium?.copyWith(
-              //                         fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-              //                         color: isSelected ? blue900 : null,
-              //                       ),
-              //                     ),
-              //                     subtitle: Text(device.address, style: myTextTheme.bodySmall),
-              //                     trailing: isSelected
-              //                         ? const Icon(Icons.check_circle, color: blue900)
-              //                         : Text(
-              //                             device.type.toString().split('.').last,
-              //                             style: myTextTheme.bodySmall,
-              //                           ),
-              //                   ),
-              //                 ),
-              //               );
-              //             },
-              //           ),
-              //         ],
-              //       ),
-              //     );
-              //   },
-              // ),
               const SizedBox(height: 130.0),
             ],
           ),

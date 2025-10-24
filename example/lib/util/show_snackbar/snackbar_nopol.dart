@@ -18,7 +18,10 @@ showCustomSnackBar(BuildContext context, String message, {VoidCallback? onPresse
           color: red400,
           borderRadius: BorderRadius.all(Radius.circular(12.0)),
         ),
-        child: Text(message, style: myTextTheme.bodyMedium?.copyWith(color: neutralWhite)),
+        child: Text(
+          message,
+          style: myTextTheme.bodyMedium?.copyWith(color: const Color.fromARGB(255, 57, 57, 57)),
+        ),
       ),
       action: onPressed != null
           ? SnackBarAction(label: "OK", textColor: neutralWhite, onPressed: onPressed)

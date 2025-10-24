@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
-import 'package:ultralytics_yolo_example/state_util.dart';
 import 'package:ultralytics_yolo_example/theme/theme_config.dart';
 
-Future showCircleDialogLoading() async {
+Future showCircleDialogLoading(BuildContext context) async {
   await showDialog<void>(
-    context: globalContext,
+    context: context,
     barrierDismissible: false,
     builder: (BuildContext context) {
       return AlertDialog(
