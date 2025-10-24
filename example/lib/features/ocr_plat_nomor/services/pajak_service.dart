@@ -4,7 +4,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/material.dart';
-import 'package:ultralytics_yolo_example/services/get_info_pajak_model.dart';
+import '../models/get_info_pajak_model.dart';
 
 /// Response wrapper untuk API pajak - simplified
 class PajakInfo {

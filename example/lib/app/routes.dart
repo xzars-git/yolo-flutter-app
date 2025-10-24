@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:ultralytics_yolo_example/features/detail_telusur_mandiri_ocr/view/detail_telusur_mandiri_ocr_view.dart';
 import 'package:ultralytics_yolo_example/features/input_nomor_polisi_ocr/view/input_nomor_polisi_ocr_view.dart';
 import 'package:ultralytics_yolo_example/model/data_besaran_pajak.dart';
-import '../presentation/screens/simple_ocr_test_screen.dart';
+import '../features/ocr_plat_nomor/screens/license_plate_cropping_screen.dart';
 
 /// Centralized route configuration
 class AppRoutes {
@@ -11,7 +11,7 @@ class AppRoutes {
 
   // Route names
   static const String home = '/';
-  static const String ocrTest = '/ocr-test';
+  static const String ocrPlatNomor = '/ocr-plat-nomor';
   static const String inputNopol = '/input-nopol';
   static const String detailNopol = '/detail-nopol';
 
@@ -23,8 +23,11 @@ class AppRoutes {
           builder: (_) => const InputNomorPolisiOcrView(),
           settings: settings,
         );
-      case ocrTest:
-        return MaterialPageRoute(builder: (_) => const SimpleOCRTestScreen(), settings: settings);
+      case ocrPlatNomor:
+        return MaterialPageRoute(
+          builder: (_) => const LicensePlateCroppingScreen(),
+          settings: settings,
+        );
       case inputNopol:
         return MaterialPageRoute(
           builder: (_) => const InputNomorPolisiOcrView(),
@@ -32,7 +35,7 @@ class AppRoutes {
         );
       case detailNopol:
         return MaterialPageRoute(
-          builder: (_) => const DetailTelusurMandiriOcrView(),
+          builder: (_) => const LicensePlateCroppingScreen(),
           settings: settings,
         );
 
@@ -50,12 +53,12 @@ class AppRoutes {
   static Map<String, WidgetBuilder> get routes {
     return {
       home: (context) => const InputNomorPolisiOcrView(),
-      ocrTest: (context) => const SimpleOCRTestScreen(),
       inputNopol: (context) => const InputNomorPolisiOcrView(),
       detailNopol: (context) {
         final args = ModalRoute.of(context)?.settings.arguments as DataKendaraan?;
         return DetailTelusurMandiriOcrView(dataKendaraan: args);
       },
+      ocrPlatNomor: (context) => const LicensePlateCroppingScreen(),
     };
   }
 }

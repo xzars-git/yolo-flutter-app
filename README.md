@@ -121,6 +121,63 @@ For Android: Create a folder called **android/app/src/main/assets** and place tf
 
 **Performance**: Up to 30 FPS on modern devices | **Model Size**: Optimized from 6MB | **Platforms**: iOS 13.0+ & Android API 21+
 
+## ⚠️ Known Issues (Fork-Specific)
+
+### Double Overlay Bug (v0.1.38+)
+
+**Issue**: Using `onResult` callback with `showOverlays: true` causes duplicate bounding boxes to render.
+
+**Root Cause**: The `onResult` callback triggers `setState()` → widget rebuild → second `overlayView.invalidate()` call, resulting in double rendering.
+
+**Workaround**: Use `onStreamingData` instead of `onResult` for detection tracking:
+
+```dart
+YOLOView(
+  showOverlays: true,  // Native overlay enabled
+  streamingConfig: YOLOStreamingConfig(
+    includeDetections: true,  // Required for detection data
+    inferenceFrequency: 15,
+  ),
+  onStreamingData: (Map<String, dynamic> data) {
+    final detections = data['detections'] as List?;
+    final count = detections?.length ?? 0;
+    setState(() {
+      _detectionCount = count;
+      _statusMessage = count == 0 ? 'Scanning...' : '$count detected';
+    });
+  },
+  // Don't use onResult with showOverlays: true
+)
+```
+
+**Why This Works**: `onStreamingData` is a data-only callback isolated from the overlay rendering pipeline. Calling `setState()` inside it doesn't trigger a second overlay render.
+
+### Automatic Cropping Feature
+
+**Added**: Backported from custom fork for ALPR (Automatic License Plate Recognition) use cases.
+
+**Features**:
+- Automatic cropping of detected objects from camera frames
+- Rotation fix for portrait mode
+- Configurable via `YOLOStreamingConfig`
+- Returns cropped images via `onCroppedImages` callback
+
+**Usage**:
+```dart
+YOLOView(
+  streamingConfig: YOLOStreamingConfig(
+    cropDetectedObjects: true,
+    confidenceThreshold: 0.5,
+  ),
+  onCroppedImages: (List<YOLOCroppedImage> crops) {
+    for (var crop in crops) {
+      // Process cropped image (e.g., OCR)
+      print('Cropped: ${crop.label} (${crop.confidence})');
+    }
+  },
+)
+```
+
 ## 📚 Documentation
 
 | Guide                                              | Description                       | For             |

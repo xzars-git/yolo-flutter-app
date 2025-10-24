@@ -13,5 +13,5 @@ export 'controllers/ocr_controller.dart';
 export 'services/ocr_service.dart' hide OCRResult; // Hide internal OCRResult class (for confidence scores)
 export 'services/pajak_service.dart';
 
-// Views - temporary wrapper, nanti akan di-refactor
-export 'package:ultralytics_yolo_example/presentation/screens/simple_ocr_test_screen.dart';
+// Screens
+export 'screens/license_plate_cropping_screen.dart';
