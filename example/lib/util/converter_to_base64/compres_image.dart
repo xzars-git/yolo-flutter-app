@@ -1,9 +1,6 @@
 import 'dart:typed_data';
-import 'dart:io';
 // import 'package:flutter_image_compress/flutter_image_compress.dart';
 import 'dart:convert';
-
-import 'package:ultralytics_yolo_example/service/api_service.dart';
 
 // Class to store compression result info
 class CompressionResult {
@@ -188,46 +185,46 @@ bool wasLastCompressionSuccessful() {
 }
 
 // Function to validate image data
-Future<bool> _validateImageData(Uint8List imageData) async {
-  try {
-    // Method 1: Try encoding to base64 and decoding back
-    String base64String = base64Encode(imageData);
-    Uint8List decodedData = base64Decode(base64String);
+// Future<bool> _validateImageData(Uint8List imageData) async {
+//   try {
+//     // Method 1: Try encoding to base64 and decoding back
+//     String base64String = base64Encode(imageData);
+//     Uint8List decodedData = base64Decode(base64String);
 
-    // Check if decoded data matches original data
-    if (decodedData.length != imageData.length) {
-      return false;
-    }
+//     // Check if decoded data matches original data
+//     if (decodedData.length != imageData.length) {
+//       return false;
+//     }
 
-    // Method 2: Additional validation - check image headers
-    // JPEG starts with FF D8
-    if (imageData.length >= 2) {
-      if ((imageData[0] == 0xFF && imageData[1] == 0xD8)) {
-        // It's a JPEG, check for proper JPEG end marker (FF D9)
-        if (imageData.length >= 2 &&
-            imageData[imageData.length - 2] == 0xFF &&
-            imageData[imageData.length - 1] == 0xD9) {
-          return true;
-        }
-      }
+//     // Method 2: Additional validation - check image headers
+//     // JPEG starts with FF D8
+//     if (imageData.length >= 2) {
+//       if ((imageData[0] == 0xFF && imageData[1] == 0xD8)) {
+//         // It's a JPEG, check for proper JPEG end marker (FF D9)
+//         if (imageData.length >= 2 &&
+//             imageData[imageData.length - 2] == 0xFF &&
+//             imageData[imageData.length - 1] == 0xD9) {
+//           return true;
+//         }
+//       }
 
-      // PNG starts with 89 50 4E 47
-      if (imageData.length >= 8 &&
-          imageData[0] == 0x89 &&
-          imageData[1] == 0x50 &&
-          imageData[2] == 0x4E &&
-          imageData[3] == 0x47) {
-        return true;
-      }
-    }
+//       // PNG starts with 89 50 4E 47
+//       if (imageData.length >= 8 &&
+//           imageData[0] == 0x89 &&
+//           imageData[1] == 0x50 &&
+//           imageData[2] == 0x4E &&
+//           imageData[3] == 0x47) {
+//         return true;
+//       }
+//     }
 
-    // If we couldn't verify with specific format checks,
-    // trust the base64 encoding/decoding success
-    return true;
-  } catch (e) {
-    return false;
-  }
-}
+//     // If we couldn't verify with specific format checks,
+//     // trust the base64 encoding/decoding success
+//     return true;
+//   } catch (e) {
+//     return false;
+//   }
+// }
 
 // Check if a base64 string is valid before sending to server
 bool isValidBase64Image(String base64String) {
